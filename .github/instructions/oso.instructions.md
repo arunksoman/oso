@@ -262,6 +262,203 @@ is NOT allowed.
 
 ---
 
+# Oso (Object Storage Operator) – Icon System
+
+The application MUST use **HugeIcons** consistently across the entire UI.
+
+All icons must be rendered using:
+
+    <HugeiconsIcon icon={IconName} />
+
+Do NOT use any other icon library, emoji, or custom SVG.
+
+---
+
+## Folder Icons
+- Bucket:
+    <HugeiconsIcon icon={BucketIcon} />
+
+- Folder:
+    <HugeiconsIcon icon={Folder01Icon} />
+
+- Folder Open:
+    <HugeiconsIcon icon={Folder02Icon} />
+
+- Add Folder:
+    <HugeiconsIcon icon={FolderAddIcon} />
+
+---
+
+## File Operations
+
+- Edit / Rename:
+    <HugeiconsIcon icon={Edit01Icon} />
+
+- Delete / Bin:
+    <HugeiconsIcon icon={Delete02Icon} />
+
+- Upload:
+    <HugeiconsIcon icon={Upload01Icon} />
+
+- Download:
+    <HugeiconsIcon icon={Download01Icon} />
+
+- Copy:
+    <HugeiconsIcon icon={Copy01Icon} />
+
+- Cut:
+    <HugeiconsIcon icon={Scissor01Icon} />
+
+- Move:
+    <HugeiconsIcon icon={ArrowDataTransferHorizontalIcon} />
+
+- Paste File:
+    <HugeiconsIcon icon={FilePasteIcon} />
+
+- Clipboard:
+    <HugeiconsIcon icon={ClipboardIcon} />
+
+---
+
+## Navigation & UI
+
+- Search:
+    <HugeiconsIcon icon={Search01Icon} />
+
+- Go to Parent Folder:
+    <HugeiconsIcon icon={ArrowUp02Icon} />
+
+- Back:
+    <HugeiconsIcon icon={ArrowLeft02Icon} />
+
+- Refresh:
+    <HugeiconsIcon icon={Refresh01Icon} />
+
+- Settings:
+    <HugeiconsIcon icon={Settings01Icon} />
+
+---
+
+## Link Icon
+
+- presigned URL / share link:
+    <HugeiconsIcon icon={Link03Icon} />
+
+## Status & Feedback
+
+- Success:
+    <HugeiconsIcon icon={Tick01Icon} />
+
+- Connection Error:
+    <HugeiconsIcon icon={WifiError02Icon} />
+
+- Alert / Warning:
+    <HugeiconsIcon icon={Alert02Icon} />
+
+---
+
+## File Type Icons
+
+- PPT:
+    <HugeiconsIcon icon={Ppt02Icon} />
+
+- DOC:
+    <HugeiconsIcon icon={Doc02Icon} />
+
+- Excel:
+    <HugeiconsIcon icon={Xls02Icon} />
+
+- Video:
+    <HugeiconsIcon icon={FileVideoIcon} />
+
+- Image:
+    <HugeiconsIcon icon={FileImageIcon} />
+
+- Code:
+    <HugeiconsIcon icon={FileCodeCornerIcon} />
+
+- Executable:
+    <HugeiconsIcon icon={FileDigitIcon} />
+
+- Music:
+    <HugeiconsIcon icon={FileMusicIcon} />
+
+- ZIP:
+    <HugeiconsIcon icon={FileZipIcon} />
+
+- 7z:
+    <HugeiconsIcon icon={FileZipIcon} />
+
+- RAR:
+    <HugeiconsIcon icon={Rar02Icon} />
+
+- RAW:
+    <HugeiconsIcon icon={Raw02Icon} />
+
+- SVG:
+    <HugeiconsIcon icon={Svg02Icon} />
+
+- CSV:
+    <HugeiconsIcon icon={Csv02Icon} />
+
+- PDF:
+    <HugeiconsIcon icon={Pdf02Icon} />
+
+- TXT:
+    <HugeiconsIcon icon={Txt02Icon} />
+
+- Archive (generic):
+    <HugeiconsIcon icon={FileArchiveIcon} />
+
+- Unknown:
+    <HugeiconsIcon icon={FileUnknownIcon} />
+
+---
+
+## File Type Mapping Rules
+
+- Code-like files:
+  - `.json`, `.js`, `.ts`, `.py`, `.yaml`, `.yml`, `.md`
+  → Use:
+        <HugeiconsIcon icon={FileCodeCornerIcon} />
+
+- Text-like files:
+  - `.txt`, `.log`
+  → Use:
+        <HugeiconsIcon icon={Txt02Icon} />
+
+- Archive files:
+  - `.zip`, `.rar`, `.7z`, `.tar`, `.gz`
+  → Use appropriate archive icon (or fallback to `FileArchiveIcon`)
+
+- If exact type exists above → use mapped icon
+
+- If type is unknown or unsupported:
+  → Use:
+        <HugeiconsIcon icon={FileUnknownIcon} />
+
+---
+
+## Consistency Rules
+
+- Always use `<HugeiconsIcon />`
+- Maintain consistent icon size across:
+  - Sidebar
+  - File list
+  - Toolbar
+- Do not mix multiple icon styles
+- Icons must align visually with text (baseline alignment)
+- Avoid unnecessary icon usage (keep UI clean)
+
+---
+
+## Invalid Usage
+
+- Mixing icon libraries
+- Using emojis as icons
+- Guessing icon names not defined above
+- Inconsistent icon usage for same action
+
 ## Important Notes
 
 - Do NOT load entire bucket contents at once.

@@ -1,4 +1,52 @@
 @import "tailwindcss";
 @plugin "daisyui" {
-  themes: light --default, dark --prefersdark, synthwave;
+  themes: forest --default, dark, light;
+}
+
+/* ── Flat design overrides ───────────────────────────────────────────────── */
+[data-theme] {
+  --radius-box: 0.15rem;
+  --radius-btn: 0.15rem;
+  --radius-badge: 0.15rem;
+  --animation-btn: 0;
+  --animation-input: 0;
+  --border-btn: 1px;
+}
+
+/* ── Scrollbars ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(var(--bc) / 0.12);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(var(--bc) / 0.25);
+}
+
+/* ── Table ───────────────────────────────────────────────────────────────── */
+.table th,
+.table td {
+  border-bottom-color: oklch(var(--bc) / 0.06);
+}
+.table tr:hover td {
+  background: oklch(var(--bc) / 0.04);
+}
+.table tr.bg-primary:hover td {
+  background: transparent;
+}
+
+/* ── Focus ring ──────────────────────────────────────────────────────────── */
+*:focus-visible {
+  outline: 1px solid oklch(var(--p));
+  outline-offset: 0;
+}
+
+/* ── Select ─────────────────────────────────────────────────────────────── */
+select option {
+  background: oklch(var(--b2));
 }
