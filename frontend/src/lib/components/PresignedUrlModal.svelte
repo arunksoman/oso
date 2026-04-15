@@ -57,9 +57,11 @@
 </script>
 
 <!-- Backdrop -->
+<!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
 <div class="fixed inset-0 z-50 flex items-center justify-center" onclick={close}>
   <div class="absolute inset-0 bg-black/60"></div>
 
+  <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
   <!-- Modal -->
   <div
     class="relative bg-base-200 border border-base-300 w-full max-w-lg shadow-2xl"
@@ -83,8 +85,9 @@
 
       <!-- Expiry selector -->
       <div class="flex items-center gap-3">
-        <label class="text-xs text-base-content/40 whitespace-nowrap">Expires in</label>
+        <label for="presigned-expiry" class="text-xs text-base-content/40 whitespace-nowrap">Expires in</label>
         <select
+          id="presigned-expiry"
           class="select select-bordered select-xs bg-base-100 flex-1"
           bind:value={expiry}
           onchange={generate}

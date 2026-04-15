@@ -46,7 +46,7 @@ export type ClipboardEntry = {
   keys: string[];
 } | null;
 
-export type NotificationType = 'success' | 'error' | 'info';
+export type NotificationType = 'success' | 'error' | 'info' | 'warning';
 
 class AppState {
   // Connection status

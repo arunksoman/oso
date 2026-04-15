@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -428,7 +429,12 @@ func (a *App) CopyObject(srcBucket, srcKey, dstBucket, dstKey string) error {
 	if a.s3Client == nil {
 		return fmt.Errorf("not connected to S3")
 	}
-	copySource := fmt.Sprintf("%s/%s", srcBucket, srcKey)
+	// URL-encode each segment of the key for S3-compatible backends
+	parts := strings.Split(srcKey, "/")
+	for i, p := range parts {
+		parts[i] = url.PathEscape(p)
+	}
+	copySource := fmt.Sprintf("%s/%s", srcBucket, strings.Join(parts, "/"))
 	_, err := a.s3Client.CopyObject(context.TODO(), &s3.CopyObjectInput{
 		Bucket:     aws.String(dstBucket),
 		Key:        aws.String(dstKey),

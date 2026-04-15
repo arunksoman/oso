@@ -100,6 +100,7 @@
           class="w-1.5 shrink-0"
           class:bg-success={t === 'success'}
           class:bg-error={t === 'error'}
+          class:bg-warning={t === 'warning'}
           class:bg-info={t === 'info'}
         ></div>
         <!-- Icon -->
@@ -108,6 +109,8 @@
             <span class="text-success"><HugeiconsIcon icon={Tick01Icon} size={18} /></span>
           {:else if t === 'error'}
             <span class="text-error"><HugeiconsIcon icon={Alert02Icon} size={18} /></span>
+          {:else if t === 'warning'}
+            <span class="text-warning"><HugeiconsIcon icon={Alert02Icon} size={18} /></span>
           {:else}
             <span class="text-info"><HugeiconsIcon icon={InformationCircleIcon} size={18} /></span>
           {/if}

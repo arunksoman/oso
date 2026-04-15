@@ -80,8 +80,10 @@
 </script>
 
 <div class="fixed inset-0 z-50 flex items-center justify-center">
+  <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
   <div class="absolute inset-0 bg-black/60" onclick={close}></div>
 
+  <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
   <div
     class="relative bg-base-200 border border-base-300 w-full max-w-lg shadow-2xl"
     onclick={(e) => e.stopPropagation()}
@@ -149,24 +151,24 @@
       {:else}
         <div class="flex flex-col gap-4">
           <div class="flex flex-col gap-1">
-            <label class="text-xs font-bold uppercase tracking-widest text-base-content/30">Endpoint URL</label>
-            <input type="url" class="input input-bordered input-sm bg-base-100 font-mono" bind:value={config.endpoint} />
+            <label for="settings-endpoint" class="text-xs font-bold uppercase tracking-widest text-base-content/30">Endpoint URL</label>
+            <input id="settings-endpoint" type="url" class="input input-bordered input-sm bg-base-100 font-mono" bind:value={config.endpoint} />
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div class="flex flex-col gap-1">
-              <label class="text-xs font-bold uppercase tracking-widest text-base-content/30">Access Key</label>
-              <input type="text" class="input input-bordered input-sm bg-base-100 font-mono text-xs" autocomplete="off" bind:value={config.accessKey} />
+              <label for="settings-access-key" class="text-xs font-bold uppercase tracking-widest text-base-content/30">Access Key</label>
+              <input id="settings-access-key" type="text" class="input input-bordered input-sm bg-base-100 font-mono text-xs" autocomplete="off" bind:value={config.accessKey} />
             </div>
             <div class="flex flex-col gap-1">
-              <label class="text-xs font-bold uppercase tracking-widest text-base-content/30">Secret Key</label>
-              <input type="password" class="input input-bordered input-sm bg-base-100 font-mono text-xs" autocomplete="off" bind:value={config.secretKey} />
+              <label for="settings-secret-key" class="text-xs font-bold uppercase tracking-widest text-base-content/30">Secret Key</label>
+              <input id="settings-secret-key" type="password" class="input input-bordered input-sm bg-base-100 font-mono text-xs" autocomplete="off" bind:value={config.secretKey} />
             </div>
           </div>
 
           <div class="flex flex-col gap-1">
-            <label class="text-xs font-bold uppercase tracking-widest text-base-content/30">Region</label>
-            <input type="text" class="input input-bordered input-sm bg-base-100" bind:value={config.region} />
+            <label for="settings-region" class="text-xs font-bold uppercase tracking-widest text-base-content/30">Region</label>
+            <input id="settings-region" type="text" class="input input-bordered input-sm bg-base-100" bind:value={config.region} />
           </div>
 
           {#if connError}

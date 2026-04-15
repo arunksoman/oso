@@ -40,8 +40,10 @@
 </script>
 
 <div class="fixed inset-0 z-50 flex items-center justify-center">
+  <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
   <div class="absolute inset-0 bg-black/60" onclick={cancel}></div>
 
+  <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
   <div
     class="relative bg-base-200 border border-base-300 w-full max-w-sm shadow-2xl"
     onclick={(e) => e.stopPropagation()}

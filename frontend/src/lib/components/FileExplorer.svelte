@@ -41,6 +41,9 @@
   let newFolderName = $state('');
   let creatingFolder = $state(false);
 
+  /** Svelte action: focus element on mount */
+  function focus(node: HTMLElement) { node.focus(); }
+
   // ─── Data loading ────────────────────────────────────────────────────────────
 
   async function loadObjects(reset = false) {
@@ -213,8 +216,10 @@
   async function doPaste() {
     if (!appState.clipboard || !appState.currentBucket) return;
     const { operation, bucket: src, keys } = appState.clipboard;
-    try {
-      for (const key of keys) {
+    let succeeded = 0;
+    let failed = 0;
+    for (const key of keys) {
+      try {
         const isFolder = key.endsWith('/');
         const name = key.split('/').filter(Boolean).pop() ?? key;
         if (isFolder) {
@@ -232,13 +237,21 @@
             await MoveObject(src, key, appState.currentBucket, dstKey);
           }
         }
+        succeeded++;
+      } catch (e) {
+        console.error(`Paste item failed: ${key}`, e);
+        failed++;
       }
-      if (operation === 'cut') appState.clipboard = null;
-      appState.notify(`Pasted ${keys.length} item(s)`, 'success');
-      appState.refreshTrigger = Date.now();
-    } catch (e) {
-      appState.notify(`Paste failed: ${e}`, 'error');
     }
+    if (operation === 'cut') appState.clipboard = null;
+    if (failed === 0) {
+      appState.notify(`Pasted ${succeeded} item(s)`, 'success');
+    } else if (succeeded > 0) {
+      appState.notify(`Pasted ${succeeded} item(s), ${failed} failed`, 'warning');
+    } else {
+      appState.notify(`Paste failed for all ${failed} item(s)`, 'error');
+    }
+    appState.refreshTrigger = Date.now();
     closeCtx();
   }
 
@@ -351,7 +364,7 @@
           class="input input-bordered input-xs bg-base-100 w-48 font-mono"
           placeholder="folder-name"
           bind:value={newFolderName}
-          autofocus
+          use:focus
           onkeydown={(e) => {
             if (e.key === 'Enter') void doCreateFolder();
             if (e.key === 'Escape') { appState.showNewFolder = false; newFolderName = ''; }
@@ -376,9 +389,9 @@
       </div>
     {/if}
 
-    <!-- Bulk operations bar -->
-    {#if appState.selectedKeys.size > 0}
-      <div class="flex items-center gap-2 px-4 py-1.5 bg-primary/8 border-b border-primary/15 text-xs shrink-0 select-none">
+    <!-- Bulk operations bar (always reserves space) -->
+    <div class="flex items-center gap-2 px-4 py-1.5 border-b text-xs shrink-0 select-none {appState.selectedKeys.size > 0 ? 'bg-primary/8 border-primary/15' : 'border-transparent'}">
+      <div class={appState.selectedKeys.size > 0 ? 'contents' : 'invisible contents'}>
         <span class="text-primary font-semibold">{appState.selectedKeys.size} selected</span>
         <div class="flex items-center gap-1 ml-2">
           <button class="btn btn-ghost btn-xs h-5 min-h-0 px-2 gap-1 text-xs" onclick={doCopy} title="Copy">
@@ -411,11 +424,12 @@
           Clear
         </button>
       </div>
-    {/if}
+    </div>
 
     <!-- File table -->
     <div
       class="flex-1 overflow-y-auto"
+      role="region"
       oncontextmenu={(e) => openCtx(e, null)}
     >
       {#if appState.objects.length === 0 && !appState.isLoading}
@@ -473,7 +487,7 @@
                 <td class="py-1.5 px-2 w-8" onclick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
-                    class="checkbox checkbox-xs checkbox-primary"
+                    class={`checkbox checkbox-xs ${sel ? 'border-white' : 'checkbox-primary'}`}
                     checked={sel}
                     onchange={(e) => toggleCheck(e, obj)}
                   />
@@ -501,16 +515,15 @@
                   </td>
                 {/if}
                 <td class="py-1.5 px-2 w-8">
-                  {#if !multiSelected}
-                    <button
-                      class="btn btn-ghost btn-xs btn-square p-0 h-6 w-6 min-h-0 opacity-0 group-hover:opacity-60 hover:opacity-100! transition-opacity"
-                      class:opacity-60={sel}
-                      onclick={(e) => openItemMenu(e, obj)}
-                      title="Actions"
-                    >
-                      <HugeiconsIcon icon={MoreVerticalIcon} size={14} />
-                    </button>
-                  {/if}
+                  <button
+                    class="btn btn-ghost btn-xs btn-square p-0 h-6 w-6 min-h-0 opacity-0 group-hover:opacity-60 hover:opacity-100! transition-opacity"
+                    class:opacity-60={sel}
+                    class:invisible={multiSelected}
+                    onclick={(e) => openItemMenu(e, obj)}
+                    title="Actions"
+                  >
+                    <HugeiconsIcon icon={MoreVerticalIcon} size={14} />
+                  </button>
                 </td>
               </tr>
             {/each}
@@ -536,11 +549,15 @@
 
 <!-- Context menu -->
 {#if ctxMenu}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="fixed z-50 bg-base-200 border border-base-300 rounded-box shadow-2xl min-w-48 py-1"
     style="left:{Math.min(ctxMenu.x, window.innerWidth - 200)}px; top:{Math.min(ctxMenu.y, window.innerHeight - 300)}px;"
     onclick={(e) => e.stopPropagation()}
     oncontextmenu={(e) => e.preventDefault()}
+    onkeydown={(e) => { if (e.key === 'Escape') ctxMenu = null; }}
+    role="menu"
+    tabindex="-1"
   >
     {#if ctxMenu.target}
       {@const t = ctxMenu.target}

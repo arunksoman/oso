@@ -27,10 +27,6 @@
       connecting = false;
     }
   }
-
-  function handleKeyDown(e: KeyboardEvent) {
-    if (e.key === 'Enter') handleConnect();
-  }
 </script>
 
 <div class="h-screen flex items-center justify-center bg-base-100">
@@ -47,22 +43,23 @@
     </div>
 
     <!-- Form -->
-    <div class="px-8 py-6 flex flex-col gap-4" onkeydown={handleKeyDown}>
+    <form class="px-8 py-6 flex flex-col gap-4" onsubmit={(e) => { e.preventDefault(); handleConnect(); }}>
       <div class="flex flex-col gap-1">
-        <label class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Endpoint URL</label>
+        <label for="setup-endpoint" class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Endpoint URL</label>
         <input
+          id="setup-endpoint"
           type="url"
           class="input input-bordered input-sm bg-base-100 w-full font-mono text-sm"
           placeholder="https://s3.amazonaws.com"
           bind:value={endpoint}
-          autofocus
         />
       </div>
 
       <div class="grid grid-cols-2 gap-3">
         <div class="flex flex-col gap-1">
-          <label class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Access Key</label>
+          <label for="setup-access-key" class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Access Key</label>
           <input
+            id="setup-access-key"
             type="text"
             class="input input-bordered input-sm bg-base-100 w-full font-mono text-xs"
             placeholder="AKIAIOSFODNN7"
@@ -73,8 +70,9 @@
           />
         </div>
         <div class="flex flex-col gap-1">
-          <label class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Secret Key</label>
+          <label for="setup-secret-key" class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Secret Key</label>
           <input
+            id="setup-secret-key"
             type="password"
             class="input input-bordered input-sm bg-base-100 w-full font-mono text-xs"
             placeholder="••••••••"
@@ -85,8 +83,9 @@
       </div>
 
       <div class="flex flex-col gap-1">
-        <label class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Region</label>
+        <label for="setup-region" class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Region</label>
         <input
+          id="setup-region"
           type="text"
           class="input input-bordered input-sm bg-base-100 w-full"
           placeholder="us-east-1"
@@ -113,7 +112,7 @@
           Connect
         {/if}
       </button>
-    </div>
+    </form>
 
     <div class="px-8 pb-6 text-center text-xs text-base-content/25">
       Credentials saved to <span class="font-mono">~/.oso/config.json</span>
