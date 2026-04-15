@@ -56,9 +56,8 @@ jobs:
           go-build-flags: -ldflags "-X main.version=${{ steps.version.outputs.APP_VERSION }}"
 
       - name: List build output (debug)
-        if: runner.os == 'Windows'
         shell: bash
-        run: find build/bin -type f 2>/dev/null || echo "build/bin not found"
+        run: ls -laR build/bin/
 
       - name: Make Linux binary executable
         if: runner.os == 'Linux'
@@ -71,9 +70,7 @@ jobs:
       - name: Rename Windows binary
         if: runner.os == 'Windows'
         shell: bash
-        run: |
-          BIN=$(find build/bin -maxdepth 1 -iname "*.exe" -type f | head -1)
-          [ -n "$BIN" ] && mv "$BIN" build/bin/${{ matrix.build.name }}-windows-amd64.exe
+        run: mv build/bin/${{ matrix.build.name }} build/bin/${{ matrix.build.name }}-windows-amd64.exe
 
       - name: Package macOS app
         if: runner.os == 'macOS'
