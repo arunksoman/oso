@@ -40,6 +40,11 @@ jobs:
         shell: bash
         run: echo "APP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
       - name: Build Wails app
         uses: dAppCore/build/actions/build/wails2@v4.0.0
         with:
