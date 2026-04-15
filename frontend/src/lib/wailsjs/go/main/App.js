@@ -54,6 +54,10 @@ export function GetSettings() {
   return window['go']['main']['App']['GetSettings']();
 }
 
+export function GetVersion() {
+  return window['go']['main']['App']['GetVersion']();
+}
+
 export function IsConnected() {
   return window['go']['main']['App']['IsConnected']();
 }

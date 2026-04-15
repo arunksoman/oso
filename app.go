@@ -18,6 +18,9 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
+// version is set at build time via -ldflags "-X main.version=x.y.z"
+var version = "dev"
+
 // App struct
 type App struct {
 	ctx           context.Context
@@ -97,6 +100,25 @@ func (pr *progressReader) Seek(offset int64, whence int) (int64, error) {
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{}
+}
+
+// GetVersion returns the app version
+func (a *App) GetVersion() string {
+	if version != "dev" {
+		return version
+	}
+	// Fallback: read from version.json for dev mode
+	data, err := os.ReadFile("version.json")
+	if err != nil {
+		return version
+	}
+	var v struct {
+		Version string `json:"version"`
+	}
+	if json.Unmarshal(data, &v) == nil && v.Version != "" {
+		return v.Version
+	}
+	return version
 }
 
 func (a *App) startup(ctx context.Context) {

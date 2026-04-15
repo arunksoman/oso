@@ -28,6 +28,8 @@ export function GetSavedConfig():Promise<main.S3Config>;
 
 export function GetSettings():Promise<main.AppSettings>;
 
+export function GetVersion():Promise<string>;
+
 export function IsConnected():Promise<boolean>;
 
 export function ListBuckets():Promise<Array<main.Bucket>>;

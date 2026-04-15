@@ -2,9 +2,11 @@
   import { onMount } from 'svelte';
   import { HugeiconsIcon } from '@hugeicons/svelte';
   import { BucketIcon, Refresh01Icon } from '@hugeicons/core-free-icons';
-  import { ListBuckets } from '$lib/wailsjs/go/main/App';
+  import { ListBuckets, GetVersion } from '$lib/wailsjs/go/main/App';
   import { appState } from '$lib/stores/appState.svelte';
   import type { Bucket } from '$lib/stores/appState.svelte';
+
+  let appVersion = $state('');
 
   async function loadBuckets() {
     appState.bucketsLoading = true;
@@ -28,7 +30,10 @@
     appState.selectedKeys = new Set();
   }
 
-  onMount(loadBuckets);
+  onMount(() => {
+    loadBuckets();
+    GetVersion().then((v) => { appVersion = v; });
+  });
 </script>
 
 <aside class="w-56 bg-base-200 flex flex-col shrink-0 border-r border-base-300 overflow-hidden">
@@ -77,13 +82,14 @@
   </div>
 
   <!-- Footer -->
-  <div class="px-3 py-2 border-t border-base-300">
+  <div class="px-3 py-2 border-t border-base-300 flex flex-col items-center gap-1">
     {#if appState.currentBucket}
-      <p class="text-xs font-mono text-base-content/25 truncate" title="s3://{appState.currentBucket}">
+      <p class="text-xs font-mono text-base-content/25 truncate w-full text-center" title="s3://{appState.currentBucket}">
         s3://{appState.currentBucket}
       </p>
-    {:else}
-      <p class="text-xs text-base-content/20">Select a bucket</p>
+    {/if}
+    {#if appVersion}
+      <p class="text-xs text-base-content/40">v{appVersion}</p>
     {/if}
   </div>
 </aside>
