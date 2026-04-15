@@ -55,6 +55,11 @@ jobs:
           node-version: "20.x"
           go-build-flags: -ldflags "-X main.version=${{ steps.version.outputs.APP_VERSION }}"
 
+      - name: List build output (debug)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: find build/bin -type f 2>/dev/null || echo "build/bin not found"
+
       - name: Make Linux binary executable
         if: runner.os == 'Linux'
         run: chmod +x build/bin/${{ matrix.build.name }}
@@ -66,7 +71,9 @@ jobs:
       - name: Rename Windows binary
         if: runner.os == 'Windows'
         shell: bash
-        run: mv build/bin/${{ matrix.build.name }}.exe build/bin/${{ matrix.build.name }}-windows-amd64.exe
+        run: |
+          BIN=$(find build/bin -maxdepth 1 -iname "*.exe" -type f | head -1)
+          [ -n "$BIN" ] && mv "$BIN" build/bin/${{ matrix.build.name }}-windows-amd64.exe
 
       - name: Package macOS app
         if: runner.os == 'macOS'
