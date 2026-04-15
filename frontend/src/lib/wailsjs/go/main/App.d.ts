@@ -4,6 +4,8 @@ import {main} from '../models';
 
 export function Connect(arg1:main.S3Config):Promise<void>;
 
+export function CopyFolder(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
 export function CopyObject(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function CreateFolder(arg1:string,arg2:string,arg3:string):Promise<void>;
@@ -31,6 +33,8 @@ export function IsConnected():Promise<boolean>;
 export function ListBuckets():Promise<Array<main.Bucket>>;
 
 export function ListObjects(arg1:string,arg2:string,arg3:string,arg4:number):Promise<main.ListObjectsResult>;
+
+export function MoveFolder(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function MoveObject(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 

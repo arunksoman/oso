@@ -6,6 +6,10 @@ export function Connect(arg1) {
   return window['go']['main']['App']['Connect'](arg1);
 }
 
+export function CopyFolder(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CopyFolder'](arg1, arg2, arg3, arg4);
+}
+
 export function CopyObject(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CopyObject'](arg1, arg2, arg3, arg4);
 }
@@ -60,6 +64,10 @@ export function ListBuckets() {
 
 export function ListObjects(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['ListObjects'](arg1, arg2, arg3, arg4);
+}
+
+export function MoveFolder(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['MoveFolder'](arg1, arg2, arg3, arg4);
 }
 
 export function MoveObject(arg1, arg2, arg3, arg4) {

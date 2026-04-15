@@ -7,6 +7,7 @@
     Upload01Icon,
     FolderAddIcon,
     Settings01Icon,
+    Search01Icon,
   } from '@hugeicons/core-free-icons';
   import { OpenMultipleFilesDialog, UploadFiles } from '$lib/wailsjs/go/main/App';
   import { appState } from '$lib/stores/appState.svelte';
@@ -76,6 +77,22 @@
   <div class="flex-1 min-w-0">
     <Breadcrumb />
   </div>
+
+  <!-- Search -->
+  {#if appState.currentBucket}
+    <label class="input input-xs input-ghost bg-base-300/50 h-6 min-h-0 w-40 focus-within:w-56 transition-all gap-1.5">
+      <HugeiconsIcon icon={Search01Icon} size={12} />
+      <input
+        type="text"
+        class="grow text-xs"
+        placeholder="Filter..."
+        bind:value={appState.searchQuery}
+      />
+      {#if appState.searchQuery}
+        <button class="text-base-content/40 hover:text-base-content/70 text-xs" onclick={() => { appState.searchQuery = ''; }}>✕</button>
+      {/if}
+    </label>
+  {/if}
 
   <!-- Divider -->
   <span class="w-px h-4 bg-base-300 mx-0.5"></span>

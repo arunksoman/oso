@@ -88,6 +88,9 @@ class AppState {
   showDeleteConfirm = $state(false);
   showNewFolder = $state(false);
 
+  // Search / filter
+  searchQuery = $state('');
+
   // Presigned URL target
   presignedUrlTarget = $state<{ bucket: string; key: string; name: string } | null>(null);
 

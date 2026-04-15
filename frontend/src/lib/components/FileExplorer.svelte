@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { HugeiconsIcon } from '@hugeicons/svelte';
   import {
     Folder01Icon,
@@ -10,6 +11,7 @@
     Link03Icon,
     FolderAddIcon,
     Upload01Icon,
+    MoreVerticalIcon,
   } from '@hugeicons/core-free-icons';
   import {
     ListObjects,
@@ -17,7 +19,9 @@
     SaveFileDialog,
     CreateFolder,
     CopyObject,
+    CopyFolder,
     MoveObject,
+    MoveFolder,
     OpenMultipleFilesDialog,
     UploadFiles,
   } from '$lib/wailsjs/go/main/App';
@@ -67,18 +71,19 @@
   $effect(() => {
     const bucket = appState.currentBucket;
     const prefix = appState.currentPrefix; // track both
-    if (bucket !== null && bucket !== undefined) {
-      void loadObjects(true);
-    }
-    // silence unused warning
     void prefix;
+    if (bucket !== null && bucket !== undefined) {
+      untrack(() => void loadObjects(true));
+    }
   });
 
   // Trigger reload on manual refresh
   $effect(() => {
     const trigger = appState.refreshTrigger;
-    if (trigger > 0 && appState.currentBucket) {
-      void loadObjects(true);
+    if (trigger > 0) {
+      untrack(() => {
+        if (appState.currentBucket) void loadObjects(true);
+      });
     }
   });
 
@@ -112,9 +117,8 @@
       const b = keys.indexOf(key);
       const range = keys.slice(Math.min(a, b), Math.max(a, b) + 1);
       appState.selectedKeys = new Set([...appState.selectedKeys, ...range]);
-    } else {
-      appState.selectedKeys = new Set([key]);
     }
+    // Plain click without modifier does nothing — use checkbox or Ctrl+click
   }
 
   function handleDblClick(obj: S3Object) {
@@ -124,6 +128,7 @@
     appState.continuationToken = '';
     appState.hasMore = false;
     appState.selectedKeys = new Set();
+    appState.searchQuery = '';
   }
 
   function selectAll() {
@@ -138,6 +143,19 @@
     ctxMenu = { x: e.clientX, y: e.clientY, target };
     if (target && !appState.selectedKeys.has(target.key)) {
       appState.selectedKeys = new Set([target.key]);
+    }
+  }
+
+  function openItemMenu(e: MouseEvent, obj: S3Object) {
+    e.stopPropagation();
+    e.preventDefault();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const menuW = 192; // min-w-48 = 12rem ≈ 192px
+    let x = rect.left - menuW;
+    if (x < 0) x = rect.right;
+    ctxMenu = { x, y: rect.bottom, target: obj };
+    if (!appState.selectedKeys.has(obj.key)) {
+      appState.selectedKeys = new Set([obj.key]);
     }
   }
 
@@ -197,12 +215,22 @@
     const { operation, bucket: src, keys } = appState.clipboard;
     try {
       for (const key of keys) {
-        const fileName = key.split('/').filter(Boolean).pop() ?? key;
-        const dstKey = appState.currentPrefix + fileName;
-        if (operation === 'copy') {
-          await CopyObject(src, key, appState.currentBucket, dstKey);
+        const isFolder = key.endsWith('/');
+        const name = key.split('/').filter(Boolean).pop() ?? key;
+        if (isFolder) {
+          const dstPrefix = appState.currentPrefix + name + '/';
+          if (operation === 'copy') {
+            await CopyFolder(src, key, appState.currentBucket, dstPrefix);
+          } else {
+            await MoveFolder(src, key, appState.currentBucket, dstPrefix);
+          }
         } else {
-          await MoveObject(src, key, appState.currentBucket, dstKey);
+          const dstKey = appState.currentPrefix + name;
+          if (operation === 'copy') {
+            await CopyObject(src, key, appState.currentBucket, dstKey);
+          } else {
+            await MoveObject(src, key, appState.currentBucket, dstKey);
+          }
         }
       }
       if (operation === 'cut') appState.clipboard = null;
@@ -274,13 +302,35 @@
     if ((e.ctrlKey || e.metaKey) && e.key === 'v') void doPaste();
   }
 
-  // Derived helpers
-  const singleFile = $derived.by(() => {
-    if (appState.selectedKeys.size !== 1) return null;
-    const key = [...appState.selectedKeys][0];
-    const obj = appState.objects.find((o) => o.key === key);
-    return obj && !obj.isFolder ? obj : null;
+  // ─── Checkbox toggle ─────────────────────────────────────────────────────────
+
+  function toggleCheck(e: Event, obj: S3Object) {
+    e.stopPropagation();
+    const s = new Set(appState.selectedKeys);
+    s.has(obj.key) ? s.delete(obj.key) : s.add(obj.key);
+    appState.selectedKeys = s;
+  }
+
+  function toggleAll() {
+    if (appState.selectedKeys.size === filteredObjects.length) {
+      appState.selectedKeys = new Set();
+    } else {
+      appState.selectedKeys = new Set(filteredObjects.map((o) => o.key));
+    }
+  }
+
+  // ─── Derived helpers ─────────────────────────────────────────────────────────
+
+  const filteredObjects = $derived.by(() => {
+    const q = appState.searchQuery.toLowerCase().trim();
+    if (!q) return appState.objects;
+    return appState.objects.filter((o) => o.name.toLowerCase().includes(q));
   });
+
+  const allChecked = $derived(filteredObjects.length > 0 && appState.selectedKeys.size === filteredObjects.length);
+  const someChecked = $derived(appState.selectedKeys.size > 0 && appState.selectedKeys.size < filteredObjects.length);
+  const multiSelected = $derived(appState.selectedKeys.size > 1);
+  const hasSelectedFiles = $derived([...appState.selectedKeys].some((k) => !k.endsWith('/')));
 </script>
 
 <svelte:window onkeydown={handleKey} onclick={closeCtx} />
@@ -314,34 +364,7 @@
       </div>
     {/if}
 
-    <!-- Selection action bar -->
-    {#if appState.selectedKeys.size > 0}
-      <div class="flex items-center gap-3 px-4 py-1.5 bg-primary/8 border-b border-primary/15 text-xs shrink-0 select-none">
-        <span class="text-primary font-semibold">{appState.selectedKeys.size} selected</span>
-        <div class="flex items-center gap-2 text-base-content/50">
-          <button class="hover:text-error transition-colors" onclick={doDelete} title="Delete">
-            <HugeiconsIcon icon={Delete02Icon} size={13} />
-          </button>
-          <button class="hover:text-primary transition-colors" onclick={doCopy} title="Copy">
-            <HugeiconsIcon icon={Copy01Icon} size={13} />
-          </button>
-          <button class="hover:text-primary transition-colors" onclick={doCut} title="Cut">
-            <HugeiconsIcon icon={Scissor01Icon} size={13} />
-          </button>
-          {#if singleFile}
-            <button class="hover:text-primary transition-colors" onclick={() => doDownload()} title="Download">
-              <HugeiconsIcon icon={Download01Icon} size={13} />
-            </button>
-            <button class="hover:text-primary transition-colors" onclick={() => doPresignedUrl()} title="Presigned URL">
-              <HugeiconsIcon icon={Link03Icon} size={13} />
-            </button>
-          {/if}
-        </div>
-        <button class="ml-auto text-base-content/30 hover:text-base-content/60 text-xs" onclick={() => { appState.selectedKeys = new Set(); }}>
-          Clear
-        </button>
-      </div>
-    {/if}
+
 
     <!-- Clipboard hint bar -->
     {#if appState.clipboard && appState.selectedKeys.size === 0}
@@ -350,6 +373,43 @@
         <span class="text-info/70">{appState.clipboard.keys.length} item(s) ready to {appState.clipboard.operation}</span>
         <button class="btn btn-info btn-xs h-5 min-h-0 px-2 ml-2 text-xs" onclick={doPaste}>Paste here</button>
         <button class="btn btn-ghost btn-xs h-5 min-h-0 px-2 text-xs" onclick={() => { appState.clipboard = null; }}>Clear</button>
+      </div>
+    {/if}
+
+    <!-- Bulk operations bar -->
+    {#if appState.selectedKeys.size > 0}
+      <div class="flex items-center gap-2 px-4 py-1.5 bg-primary/8 border-b border-primary/15 text-xs shrink-0 select-none">
+        <span class="text-primary font-semibold">{appState.selectedKeys.size} selected</span>
+        <div class="flex items-center gap-1 ml-2">
+          <button class="btn btn-ghost btn-xs h-5 min-h-0 px-2 gap-1 text-xs" onclick={doCopy} title="Copy">
+            <HugeiconsIcon icon={Copy01Icon} size={12} />
+            Copy
+          </button>
+          <button class="btn btn-ghost btn-xs h-5 min-h-0 px-2 gap-1 text-xs" onclick={doCut} title="Cut">
+            <HugeiconsIcon icon={Scissor01Icon} size={12} />
+            Cut
+          </button>
+          {#if hasSelectedFiles}
+            <button class="btn btn-ghost btn-xs h-5 min-h-0 px-2 gap-1 text-xs" onclick={() => doDownload()} title="Download">
+              <HugeiconsIcon icon={Download01Icon} size={12} />
+              Download
+            </button>
+          {/if}
+          {#if appState.clipboard}
+            <button class="btn btn-ghost btn-xs h-5 min-h-0 px-2 gap-1 text-xs" onclick={doPaste} title="Paste">
+              <HugeiconsIcon icon={FilePasteIcon} size={12} />
+              Paste
+            </button>
+          {/if}
+          <span class="w-px h-3.5 bg-base-300 mx-1"></span>
+          <button class="btn btn-ghost btn-xs h-5 min-h-0 px-2 gap-1 text-xs text-error hover:bg-error/10" onclick={doDelete} title="Delete selected">
+            <HugeiconsIcon icon={Delete02Icon} size={12} />
+            Delete
+          </button>
+        </div>
+        <button class="ml-auto text-base-content/30 hover:text-base-content/60 text-xs" onclick={() => { appState.selectedKeys = new Set(); }}>
+          Clear
+        </button>
       </div>
     {/if}
 
@@ -378,18 +438,26 @@
         <table class="table table-sm w-full">
           <thead class="sticky top-0 z-10 bg-base-200">
             <tr class="border-b border-base-300">
-              <th class="py-2 px-4 text-xs font-semibold uppercase tracking-wider text-base-content/35 text-left w-full">
-                <button class="hover:text-base-content/60 transition-colors" onclick={selectAll}>Name</button>
+              <th class="py-2 px-2 w-8">
+                <input
+                  type="checkbox"
+                  class="checkbox checkbox-xs checkbox-primary"
+                  checked={allChecked}
+                  indeterminate={someChecked}
+                  onchange={toggleAll}
+                />
               </th>
+              <th class="py-2 px-2 text-xs font-semibold uppercase tracking-wider text-base-content/35 text-left w-full">Name</th>
               {#if appState.settings.showFileDetails}
                 <th class="py-2 px-4 text-xs font-semibold uppercase tracking-wider text-base-content/35 whitespace-nowrap text-right">Size</th>
                 <th class="py-2 px-4 text-xs font-semibold uppercase tracking-wider text-base-content/35 whitespace-nowrap">Type</th>
                 <th class="py-2 px-4 text-xs font-semibold uppercase tracking-wider text-base-content/35 whitespace-nowrap">Modified</th>
               {/if}
+              <th class="py-2 px-2 w-8"></th>
             </tr>
           </thead>
           <tbody>
-            {#each appState.objects as obj (obj.key)}
+            {#each filteredObjects as obj (obj.key)}
               {@const icon = getFileIcon(obj.name, obj.isFolder)}
               {@const sel = appState.selectedKeys.has(obj.key)}
               {@const clipped = !!appState.clipboard?.keys.includes(obj.key)}
@@ -402,7 +470,15 @@
                 ondblclick={() => handleDblClick(obj)}
                 oncontextmenu={(e) => openCtx(e, obj)}
               >
-                <td class="py-1.5 px-4">
+                <td class="py-1.5 px-2 w-8" onclick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-xs checkbox-primary"
+                    checked={sel}
+                    onchange={(e) => toggleCheck(e, obj)}
+                  />
+                </td>
+                <td class="py-1.5 px-2">
                   <div class="flex items-center gap-2.5">
                     <span class={sel ? 'text-primary-content/60' : obj.isFolder ? 'text-yellow-400/70' : 'text-base-content/30 group-hover:text-base-content/50'}>
                       <HugeiconsIcon icon={icon} size={15} />
@@ -424,6 +500,18 @@
                     {obj.isFolder ? '—' : formatDate(obj.lastModified)}
                   </td>
                 {/if}
+                <td class="py-1.5 px-2 w-8">
+                  {#if !multiSelected}
+                    <button
+                      class="btn btn-ghost btn-xs btn-square p-0 h-6 w-6 min-h-0 opacity-0 group-hover:opacity-60 hover:opacity-100! transition-opacity"
+                      class:opacity-60={sel}
+                      onclick={(e) => openItemMenu(e, obj)}
+                      title="Actions"
+                    >
+                      <HugeiconsIcon icon={MoreVerticalIcon} size={14} />
+                    </button>
+                  {/if}
+                </td>
               </tr>
             {/each}
           </tbody>
@@ -449,8 +537,8 @@
 <!-- Context menu -->
 {#if ctxMenu}
   <div
-    class="fixed z-50 bg-base-200 border border-base-300 shadow-2xl min-w-48 py-1"
-    style="left:{ctxMenu.x}px; top:{ctxMenu.y}px;"
+    class="fixed z-50 bg-base-200 border border-base-300 rounded-box shadow-2xl min-w-48 py-1"
+    style="left:{Math.min(ctxMenu.x, window.innerWidth - 200)}px; top:{Math.min(ctxMenu.y, window.innerHeight - 300)}px;"
     onclick={(e) => e.stopPropagation()}
     oncontextmenu={(e) => e.preventDefault()}
   >

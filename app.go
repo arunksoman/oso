@@ -14,7 +14,6 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -64,9 +63,9 @@ type ListObjectsResult struct {
 	HasMore               bool       `json:"hasMore"`
 }
 
-// progressReader wraps an io.Reader to emit upload progress events
+// progressReader wraps an io.ReadSeeker to emit upload progress events
 type progressReader struct {
-	r     io.Reader
+	r     io.ReadSeeker
 	total int64
 	read  int64
 	ctx   context.Context
@@ -84,6 +83,14 @@ func (pr *progressReader) Read(p []byte) (n int, err error) {
 		})
 	}
 	return
+}
+
+func (pr *progressReader) Seek(offset int64, whence int) (int64, error) {
+	n, err := pr.r.Seek(offset, whence)
+	if err == nil {
+		pr.read = n
+	}
+	return n, err
 }
 
 // NewApp creates a new App application struct
@@ -161,6 +168,8 @@ func (a *App) connectWithConfig(cfg *S3Config) error {
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		o.BaseEndpoint = aws.String(cfg.Endpoint)
 		o.UsePathStyle = true
+		o.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
+		o.ResponseChecksumValidation = aws.ResponseChecksumValidationWhenRequired
 	})
 
 	a.s3Client = client
@@ -366,26 +375,13 @@ func (a *App) DeleteObject(bucket, key string) error {
 	return err
 }
 
-// DeleteObjects deletes multiple S3 objects in batches of 1000
+// DeleteObjects deletes multiple S3 objects one by one (compatible with all S3 backends)
 func (a *App) DeleteObjects(bucket string, keys []string) error {
 	if a.s3Client == nil {
 		return fmt.Errorf("not connected to S3")
 	}
-	for i := 0; i < len(keys); i += 1000 {
-		end := i + 1000
-		if end > len(keys) {
-			end = len(keys)
-		}
-		objectIds := make([]s3types.ObjectIdentifier, end-i)
-		for j, k := range keys[i:end] {
-			kCopy := k
-			objectIds[j] = s3types.ObjectIdentifier{Key: &kCopy}
-		}
-		_, err := a.s3Client.DeleteObjects(context.TODO(), &s3.DeleteObjectsInput{
-			Bucket: aws.String(bucket),
-			Delete: &s3types.Delete{Objects: objectIds, Quiet: aws.Bool(true)},
-		})
-		if err != nil {
+	for _, k := range keys {
+		if err := a.DeleteObject(bucket, k); err != nil {
 			return err
 		}
 	}
@@ -411,15 +407,11 @@ func (a *App) DeleteFolder(bucket, prefix string) error {
 			return err
 		}
 		if len(result.Contents) > 0 {
-			objectIds := make([]s3types.ObjectIdentifier, len(result.Contents))
+			keys := make([]string, len(result.Contents))
 			for i, obj := range result.Contents {
-				objectIds[i] = s3types.ObjectIdentifier{Key: obj.Key}
+				keys[i] = aws.ToString(obj.Key)
 			}
-			_, err := a.s3Client.DeleteObjects(context.TODO(), &s3.DeleteObjectsInput{
-				Bucket: aws.String(bucket),
-				Delete: &s3types.Delete{Objects: objectIds, Quiet: aws.Bool(true)},
-			})
-			if err != nil {
+			if err := a.DeleteObjects(bucket, keys); err != nil {
 				return err
 			}
 		}
@@ -451,6 +443,49 @@ func (a *App) MoveObject(srcBucket, srcKey, dstBucket, dstKey string) error {
 		return err
 	}
 	return a.DeleteObject(srcBucket, srcKey)
+}
+
+// CopyFolder recursively copies all objects under a prefix to a new destination
+func (a *App) CopyFolder(srcBucket, srcPrefix, dstBucket, dstPrefix string) error {
+	if a.s3Client == nil {
+		return fmt.Errorf("not connected to S3")
+	}
+	var continuationToken *string
+	for {
+		input := &s3.ListObjectsV2Input{
+			Bucket: aws.String(srcBucket),
+			Prefix: aws.String(srcPrefix),
+		}
+		if continuationToken != nil {
+			input.ContinuationToken = continuationToken
+		}
+		result, err := a.s3Client.ListObjectsV2(context.TODO(), input)
+		if err != nil {
+			return err
+		}
+		for _, obj := range result.Contents {
+			srcKey := aws.ToString(obj.Key)
+			// Replace the source prefix with the destination prefix
+			relKey := strings.TrimPrefix(srcKey, srcPrefix)
+			dstKey := dstPrefix + relKey
+			if err := a.CopyObject(srcBucket, srcKey, dstBucket, dstKey); err != nil {
+				return fmt.Errorf("failed to copy %s: %w", srcKey, err)
+			}
+		}
+		if !aws.ToBool(result.IsTruncated) {
+			break
+		}
+		continuationToken = result.NextContinuationToken
+	}
+	return nil
+}
+
+// MoveFolder recursively moves all objects under a prefix (copy + delete)
+func (a *App) MoveFolder(srcBucket, srcPrefix, dstBucket, dstPrefix string) error {
+	if err := a.CopyFolder(srcBucket, srcPrefix, dstBucket, dstPrefix); err != nil {
+		return err
+	}
+	return a.DeleteFolder(srcBucket, srcPrefix)
 }
 
 // DownloadObject downloads an S3 object to a local path
