@@ -12,6 +12,7 @@
     FolderAddIcon,
     Upload01Icon,
     MoreVerticalIcon,
+    Search01Icon,
   } from '@hugeicons/core-free-icons';
   import {
     ListObjects,
@@ -389,9 +390,9 @@
       </div>
     {/if}
 
-    <!-- Bulk operations bar (always reserves space) -->
+    <!-- Bulk operations bar / filter bar -->
     <div class="flex items-center gap-2 px-4 py-1.5 border-b text-xs shrink-0 select-none {appState.selectedKeys.size > 0 ? 'bg-primary/8 border-primary/15' : 'border-transparent'}">
-      <div class={appState.selectedKeys.size > 0 ? 'contents' : 'invisible contents'}>
+      {#if appState.selectedKeys.size > 0}
         <span class="text-primary font-semibold">{appState.selectedKeys.size} selected</span>
         <div class="flex items-center gap-1 ml-2">
           <button class="btn btn-ghost btn-xs h-5 min-h-0 px-2 gap-1 text-xs" onclick={doCopy} title="Copy">
@@ -423,7 +424,20 @@
         <button class="ml-auto text-base-content/30 hover:text-base-content/60 text-xs" onclick={() => { appState.selectedKeys = new Set(); }}>
           Clear
         </button>
-      </div>
+      {:else}
+        <label class="input input-xs input-ghost bg-base-300/50 h-6 min-h-0 w-64 focus-within:w-80 transition-all gap-1.5 ml-auto">
+          <HugeiconsIcon icon={Search01Icon} size={12} />
+          <input
+            type="text"
+            class="grow text-xs"
+            placeholder="Filter..."
+            bind:value={appState.searchQuery}
+          />
+          {#if appState.searchQuery}
+            <button class="text-base-content/40 hover:text-base-content/70 text-xs" onclick={() => { appState.searchQuery = ''; }}>✕</button>
+          {/if}
+        </label>
+      {/if}
     </div>
 
     <!-- File table -->
@@ -451,7 +465,7 @@
       {:else}
         <table class="table table-sm w-full">
           <thead class="sticky top-0 z-10 bg-base-200">
-            <tr class="border-b border-base-300">
+            <tr>
               <th class="py-2 px-2 w-8">
                 <input
                   type="checkbox"
@@ -476,7 +490,7 @@
               {@const sel = appState.selectedKeys.has(obj.key)}
               {@const clipped = !!appState.clipboard?.keys.includes(obj.key)}
               <tr
-                class="border-b border-base-200/60 cursor-pointer transition-colors group"
+                class="cursor-pointer transition-colors group"
                 class:bg-primary={sel}
                 class:text-primary-content={sel}
                 class:opacity-50={clipped && !sel}
@@ -504,14 +518,14 @@
                   </div>
                 </td>
                 {#if appState.settings.showFileDetails}
-                  <td class="py-1.5 px-4 text-xs font-mono text-right whitespace-nowrap" class:opacity-50={!sel} class:opacity-100={sel}>
-                    {obj.isFolder ? '—' : formatFileSize(obj.size)}
+                  <td class="py-1.5 px-4 text-xs font-mono text-right whitespace-nowrap">
+                    <span class:opacity-50={!sel}>{obj.isFolder ? '—' : formatFileSize(obj.size)}</span>
                   </td>
-                  <td class="py-1.5 px-4 text-xs font-mono whitespace-nowrap" class:opacity-50={!sel} class:opacity-100={sel}>
-                    {getFileType(obj.name, obj.isFolder)}
+                  <td class="py-1.5 px-4 text-xs font-mono whitespace-nowrap">
+                    <span class:opacity-50={!sel}>{getFileType(obj.name, obj.isFolder)}</span>
                   </td>
-                  <td class="py-1.5 px-4 text-xs font-mono whitespace-nowrap" class:opacity-50={!sel} class:opacity-100={sel}>
-                    {obj.isFolder ? '—' : formatDate(obj.lastModified)}
+                  <td class="py-1.5 px-4 text-xs font-mono whitespace-nowrap">
+                    <span class:opacity-50={!sel}>{obj.isFolder ? '—' : formatDate(obj.lastModified)}</span>
                   </td>
                 {/if}
                 <td class="py-1.5 px-2 w-8">
