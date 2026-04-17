@@ -3,6 +3,7 @@
   import { BucketIcon, WifiError02Icon } from '@hugeicons/core-free-icons';
   import { Connect } from '$lib/wailsjs/go/main/App';
   import { appState } from '$lib/stores/appState.svelte';
+  import WindowControls from './WindowControls.svelte';
 
   let endpoint = $state('');
   let accessKey = $state('');
@@ -29,7 +30,13 @@
   }
 </script>
 
-<div class="h-screen flex items-center justify-center bg-base-100">
+<div class="h-screen flex flex-col bg-base-100" style="--wails-draggable: drag">
+  <!-- Title bar with window controls -->
+  <div class="flex items-center justify-end px-3 py-2 shrink-0" style="--wails-draggable: no-drag">
+    <WindowControls />
+  </div>
+
+  <div class="flex-1 flex items-center justify-center">
   <div class="w-full max-w-md bg-base-200 border border-base-300">
     <!-- Header -->
     <div class="flex flex-col items-center gap-3 px-8 pt-8 pb-6 border-b border-base-300">
@@ -117,5 +124,6 @@
     <div class="px-8 pb-6 text-center text-xs text-base-content/25">
       Credentials saved to <span class="font-mono">~/.oso/config.json</span>
     </div>
+  </div>
   </div>
 </div>

@@ -508,7 +508,7 @@
                 </td>
                 <td class="py-1.5 px-2">
                   <div class="flex items-center gap-2.5">
-                    <span class={sel ? 'text-primary-content/60' : obj.isFolder ? 'text-yellow-400/70' : 'text-base-content/30 group-hover:text-base-content/50'}>
+                    <span class={sel ? 'text-primary-content/60' : obj.isFolder ? 'text-yellow-400/70' : 'text-neutral group-hover:text-neutral/80'}>
                       <HugeiconsIcon icon={icon} size={15} />
                     </span>
                     <span class="text-sm font-mono truncate" class:italic={clipped && !sel}>{obj.name}</span>

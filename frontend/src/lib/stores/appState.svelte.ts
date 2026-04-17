@@ -11,6 +11,7 @@ export interface AppSettings {
   defaultDownloadPath: string;
   askBeforeDownload: boolean;
   showFileDetails: boolean;
+  theme: 'night' | 'light';
 }
 
 export interface Bucket {
@@ -80,6 +81,7 @@ class AppState {
     defaultDownloadPath: '',
     askBeforeDownload: true,
     showFileDetails: true,
+    theme: 'night',
   });
 
   // Modal visibility

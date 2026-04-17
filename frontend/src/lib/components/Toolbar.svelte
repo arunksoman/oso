@@ -11,6 +11,7 @@
   import { OpenMultipleFilesDialog, UploadFiles } from '$lib/wailsjs/go/main/App';
   import { appState } from '$lib/stores/appState.svelte';
   import Breadcrumb from './Breadcrumb.svelte';
+  import WindowControls from './WindowControls.svelte';
 
   let uploading = $state(false);
 
@@ -50,27 +51,29 @@
   const canGoUp = $derived(!!appState.currentPrefix);
 </script>
 
-<div class="flex items-center gap-1.5 px-3 py-2 bg-base-200 border-b border-base-300 shrink-0">
-  <!-- Nav buttons -->
-  <button
-    class="btn btn-ghost btn-xs p-1 h-auto min-h-0 text-base-content/50 hover:text-base-content"
-    onclick={goBack}
-    disabled={!canGoUp}
-    title="Back / Parent folder"
-  >
-    <HugeiconsIcon icon={ArrowLeft02Icon} size={14} />
-  </button>
-  <button
-    class="btn btn-ghost btn-xs p-1 h-auto min-h-0 text-base-content/50 hover:text-base-content"
-    onclick={goUp}
-    disabled={!canGoUp}
-    title="Go to parent folder"
-  >
-    <HugeiconsIcon icon={ArrowUp02Icon} size={14} />
-  </button>
+<div class="flex items-center gap-1.5 px-3 py-2 bg-base-200 border-b border-base-300 shrink-0" style="--wails-draggable: drag">
+  <!-- Nav buttons (only shown when a bucket is selected) -->
+  {#if appState.currentBucket}
+    <button
+      class="btn btn-ghost btn-xs p-1 h-auto min-h-0 text-base-content/50 hover:text-base-content"
+      onclick={goBack}
+      disabled={!canGoUp}
+      title="Back / Parent folder"
+    >
+      <HugeiconsIcon icon={ArrowLeft02Icon} size={14} />
+    </button>
+    <button
+      class="btn btn-ghost btn-xs p-1 h-auto min-h-0 text-base-content/50 hover:text-base-content"
+      onclick={goUp}
+      disabled={!canGoUp}
+      title="Go to parent folder"
+    >
+      <HugeiconsIcon icon={ArrowUp02Icon} size={14} />
+    </button>
 
-  <!-- Divider -->
-  <span class="w-px h-4 bg-base-300 mx-0.5"></span>
+    <!-- Divider -->
+    <span class="w-px h-4 bg-base-300 mx-0.5"></span>
+  {/if}
 
   <!-- Breadcrumb -->
   <div class="flex-1 min-w-0">
@@ -120,5 +123,12 @@
     >
       <HugeiconsIcon icon={Settings01Icon} size={14} />
     </button>
+  </div>
+
+  <span class="w-px h-4 bg-base-300 mx-0.5"></span>
+
+  <!-- Window controls -->
+  <div style="--wails-draggable: no-drag">
+    <WindowControls />
   </div>
 </div>

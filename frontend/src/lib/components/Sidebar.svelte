@@ -72,10 +72,10 @@
           class:hover:bg-base-300={appState.currentBucket !== bucket.name}
           onclick={() => selectBucket(bucket)}
         >
-          <span class={appState.currentBucket === bucket.name ? 'text-primary-content/70' : 'text-warning/60 group-hover:text-warning/80'}>
-            <HugeiconsIcon icon={BucketIcon} size={14} />
+          <span class="shrink-0 flex items-center leading-none {appState.currentBucket === bucket.name ? 'text-primary-content/70' : 'text-warning/60 group-hover:text-warning/80'}">
+            <HugeiconsIcon icon={BucketIcon} size={16} />
           </span>
-          <span class="text-xs font-medium truncate">{bucket.name}</span>
+          <span class="text-sm font-medium truncate leading-none">{bucket.name}</span>
         </button>
       {/each}
     {/if}
