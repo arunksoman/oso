@@ -14,6 +14,10 @@ export function CopyObject(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CopyObject'](arg1, arg2, arg3, arg4);
 }
 
+export function CreateBucket(arg1) {
+  return window['go']['main']['App']['CreateBucket'](arg1);
+}
+
 export function CreateFolder(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateFolder'](arg1, arg2, arg3);
 }

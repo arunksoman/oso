@@ -8,6 +8,8 @@ export function CopyFolder(arg1:string,arg2:string,arg3:string,arg4:string):Prom
 
 export function CopyObject(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
+export function CreateBucket(arg1:string):Promise<void>;
+
 export function CreateFolder(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function DeleteFolder(arg1:string,arg2:string):Promise<void>;
