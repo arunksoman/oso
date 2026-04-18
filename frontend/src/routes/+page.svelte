@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { HugeiconsIcon } from '@hugeicons/svelte';
+  import HugeiconsIcon from '$lib/components/Icon.svelte';
   import { Copy01Icon, Cancel01Icon, Tick01Icon, Alert02Icon, InformationCircleIcon } from '@hugeicons/core-free-icons';
   import { IsConnected, GetSettings } from '$lib/wailsjs/go/main/App';
   import { EventsOn } from '$lib/wailsjs/runtime/runtime';

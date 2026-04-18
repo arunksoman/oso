@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { HugeiconsIcon } from '@hugeicons/svelte';
+  import HugeiconsIcon from '$lib/components/Icon.svelte';
   import {
     Folder01Icon,
     Delete02Icon,
@@ -360,7 +360,7 @@
     <!-- New folder bar -->
     {#if appState.showNewFolder}
       <div class="flex items-center gap-2 px-4 py-2 bg-base-200 border-b border-base-300 shrink-0">
-        <HugeiconsIcon icon={FolderAddIcon} size={14} class="text-base-content/40" />
+        <HugeiconsIcon icon={FolderAddIcon} size={14} class="text-base-content/60" />
         <input
           class="input input-bordered input-xs bg-base-100 w-48 font-mono"
           placeholder="folder-name"
@@ -508,7 +508,7 @@
                 </td>
                 <td class="py-1.5 px-2">
                   <div class="flex items-center gap-2.5">
-                    <span class={sel ? 'text-primary-content/60' : obj.isFolder ? 'text-yellow-400/70' : 'text-neutral group-hover:text-neutral/80'}>
+                    <span class={sel ? 'text-primary-content/80' : obj.isFolder ? 'text-warning/85' : 'text-base-content/60 group-hover:text-base-content/90'}>
                       <HugeiconsIcon icon={icon} size={15} />
                     </span>
                     <span class="text-sm font-mono truncate" class:italic={clipped && !sel}>{obj.name}</span>
@@ -530,8 +530,8 @@
                 {/if}
                 <td class="py-1.5 px-2 w-8">
                   <button
-                    class="btn btn-ghost btn-xs btn-square p-0 h-6 w-6 min-h-0 opacity-0 group-hover:opacity-60 hover:opacity-100! transition-opacity"
-                    class:opacity-60={sel}
+                    class="btn btn-ghost btn-xs btn-square p-0 h-6 w-6 min-h-0 opacity-0 group-hover:opacity-80 hover:opacity-100! transition-opacity"
+                    class:opacity-80={sel}
                     class:invisible={multiSelected}
                     onclick={(e) => openItemMenu(e, obj)}
                     title="Actions"
@@ -581,30 +581,30 @@
           class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left transition-colors"
           onclick={() => doDownload(t)}
         >
-          <HugeiconsIcon icon={Download01Icon} size={14} class="text-base-content/40" />
+          <HugeiconsIcon icon={Download01Icon} size={14} class="text-base-content/60" />
           Download
         </button>
         <button
           class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left transition-colors"
           onclick={() => doPresignedUrl(t)}
         >
-          <HugeiconsIcon icon={Link03Icon} size={14} class="text-base-content/40" />
+          <HugeiconsIcon icon={Link03Icon} size={14} class="text-base-content/60" />
           Copy presigned URL
         </button>
         <div class="h-px bg-base-300 my-1"></div>
       {/if}
 
       <button class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left" onclick={doCopy}>
-        <HugeiconsIcon icon={Copy01Icon} size={14} class="text-base-content/40" />
+        <HugeiconsIcon icon={Copy01Icon} size={14} class="text-base-content/60" />
         Copy
       </button>
       <button class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left" onclick={doCut}>
-        <HugeiconsIcon icon={Scissor01Icon} size={14} class="text-base-content/40" />
+        <HugeiconsIcon icon={Scissor01Icon} size={14} class="text-base-content/60" />
         Cut
       </button>
       {#if appState.clipboard}
         <button class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left" onclick={doPaste}>
-          <HugeiconsIcon icon={FilePasteIcon} size={14} class="text-base-content/40" />
+          <HugeiconsIcon icon={FilePasteIcon} size={14} class="text-base-content/60" />
           Paste ({appState.clipboard.keys.length})
         </button>
       {/if}
@@ -616,17 +616,17 @@
     {:else}
       <!-- Background right-click -->
       <button class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left" onclick={() => { appState.showNewFolder = true; closeCtx(); }}>
-        <HugeiconsIcon icon={FolderAddIcon} size={14} class="text-base-content/40" />
+        <HugeiconsIcon icon={FolderAddIcon} size={14} class="text-base-content/60" />
         New folder
       </button>
       <button class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left" onclick={doUpload}>
-        <HugeiconsIcon icon={Upload01Icon} size={14} class="text-base-content/40" />
+        <HugeiconsIcon icon={Upload01Icon} size={14} class="text-base-content/60" />
         Upload files
       </button>
       {#if appState.clipboard}
         <div class="h-px bg-base-300 my-1"></div>
         <button class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left" onclick={doPaste}>
-          <HugeiconsIcon icon={FilePasteIcon} size={14} class="text-base-content/40" />
+          <HugeiconsIcon icon={FilePasteIcon} size={14} class="text-base-content/60" />
           Paste ({appState.clipboard.keys.length})
         </button>
       {/if}

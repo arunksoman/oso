@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { HugeiconsIcon } from '@hugeicons/svelte';
+  import HugeiconsIcon from '$lib/components/Icon.svelte';
   import {
     ArrowLeft02Icon,
     ArrowUp02Icon,
@@ -60,7 +60,7 @@
           disabled={!canGoUp}
           title="Back / Parent folder"
         >
-          <HugeiconsIcon icon={ArrowLeft02Icon} size={14} />
+          <HugeiconsIcon icon={ArrowLeft02Icon} size={16} />
         </button>
         <button
           class="btn btn-ghost btn-xs p-1 h-auto min-h-0 text-base-content/50 hover:text-base-content"
@@ -68,7 +68,7 @@
           disabled={!canGoUp}
           title="Go to parent folder"
         >
-          <HugeiconsIcon icon={ArrowUp02Icon} size={14} />
+          <HugeiconsIcon icon={ArrowUp02Icon} size={16} />
         </button>
 
         <span class="w-px h-4 bg-base-300 mx-0.5"></span>
@@ -93,7 +93,7 @@
         onclick={() => { appState.refreshTrigger = Date.now(); }}
         title="Refresh"
       >
-        <HugeiconsIcon icon={Refresh01Icon} size={14} />
+        <HugeiconsIcon icon={Refresh01Icon} size={16} />
       </button>
 
       <button
@@ -102,7 +102,7 @@
         disabled={!appState.currentBucket}
         title="New folder"
       >
-        <HugeiconsIcon icon={FolderAddIcon} size={14} />
+        <HugeiconsIcon icon={FolderAddIcon} size={16} />
       </button>
 
       <button
@@ -114,7 +114,7 @@
         {#if uploading}
           <span class="loading loading-spinner loading-xs"></span>
         {:else}
-          <HugeiconsIcon icon={Upload01Icon} size={13} />
+          <HugeiconsIcon icon={Upload01Icon} size={15} />
         {/if}
         Upload
       </button>
@@ -124,7 +124,7 @@
         onclick={() => { appState.showSettings = true; }}
         title="Settings"
       >
-        <HugeiconsIcon icon={Settings01Icon} size={14} />
+        <HugeiconsIcon icon={Settings01Icon} size={16} />
       </button>
     </div>
 

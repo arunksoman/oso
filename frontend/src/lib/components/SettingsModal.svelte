@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { HugeiconsIcon } from '@hugeicons/svelte';
+  import HugeiconsIcon from '$lib/components/Icon.svelte';
   import { Settings01Icon, WifiError02Icon } from '@hugeicons/core-free-icons';
   import {
     SaveSettings,

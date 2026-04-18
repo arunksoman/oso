@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { HugeiconsIcon } from '@hugeicons/svelte';
+  import HugeiconsIcon from '$lib/components/Icon.svelte';
   import {
     Cancel01Icon,
     ArrowShrink02Icon,
