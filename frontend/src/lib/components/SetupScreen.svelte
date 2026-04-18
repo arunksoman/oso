@@ -3,7 +3,7 @@
   import { BucketIcon, WifiError02Icon } from '@hugeicons/core-free-icons';
   import { Connect } from '$lib/wailsjs/go/main/App';
   import { appState } from '$lib/stores/appState.svelte';
-  import WindowControls from './WindowControls.svelte';
+  import TitleBar from './TitleBar.svelte';
 
   let endpoint = $state('');
   let accessKey = $state('');
@@ -30,11 +30,8 @@
   }
 </script>
 
-<div class="h-screen flex flex-col bg-base-100" style="--wails-draggable: drag">
-  <!-- Title bar with window controls -->
-  <div class="flex items-center justify-end px-3 py-2 shrink-0" style="--wails-draggable: no-drag">
-    <WindowControls />
-  </div>
+<div class="h-screen flex flex-col bg-base-100">
+  <TitleBar />
 
   <div class="flex-1 flex items-center justify-center">
   <div class="w-full max-w-md bg-base-200 border border-base-300">

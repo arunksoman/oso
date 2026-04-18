@@ -7,6 +7,7 @@
   import { appState } from '$lib/stores/appState.svelte';
   import SetupScreen from '$lib/components/SetupScreen.svelte';
   import Sidebar from '$lib/components/Sidebar.svelte';
+  import TitleBar from '$lib/components/TitleBar.svelte';
   import Toolbar from '$lib/components/Toolbar.svelte';
   import FileExplorer from '$lib/components/FileExplorer.svelte';
   import SettingsModal from '$lib/components/SettingsModal.svelte';
@@ -71,6 +72,7 @@
   <div class="flex h-screen w-screen overflow-hidden bg-base-100 text-base-content">
     <Sidebar />
     <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
+      <TitleBar />
       <Toolbar />
       <FileExplorer />
     </div>

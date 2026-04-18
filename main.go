@@ -20,9 +20,9 @@ func main() {
 	err := wails.Run(&options.App{
 		Title:     "Oso — Object Storage Operator",
 		Width:     900,
-		Height:    600,
+		Height:    800,
 		MinWidth:  900,
-		MinHeight: 600,
+		MinHeight: 800,
 		Frameless: true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
