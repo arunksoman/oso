@@ -10,5 +10,12 @@
     "name": "arunksoman69",
     "email": "arunksoman69@gmail.com"
   },
-  "wailsjsdir": "./frontend/src/lib"
+  "wailsjsdir": "./frontend/src/lib",
+  "info": {
+    "companyName": "StackQuest",
+    "productName": "Oso",
+    "productVersion": "0.3.0",
+    "copyright": "Copyright © 2026 StackQuest",
+    "comments": "Oso — Object Storage Operator. Built using Wails (https://wails.io)"
+  }
 }
