@@ -1,6 +1,8 @@
 package main
 
 import (
+	_ "embed"
+
 	"context"
 	"encoding/json"
 	"fmt"
@@ -20,6 +22,9 @@ import (
 
 // version is set at build time via -ldflags "-X main.version=x.y.z"
 var version = "dev"
+
+//go:embed version.json
+var versionJSON []byte
 
 // App struct
 type App struct {
@@ -107,15 +112,11 @@ func (a *App) GetVersion() string {
 	if version != "dev" {
 		return version
 	}
-	// Fallback: read from version.json for dev mode
-	data, err := os.ReadFile("version.json")
-	if err != nil {
-		return version
-	}
+	// Fallback: read from embedded version.json
 	var v struct {
 		Version string `json:"version"`
 	}
-	if json.Unmarshal(data, &v) == nil && v.Version != "" {
+	if json.Unmarshal(versionJSON, &v) == nil && v.Version != "" {
 		return v.Version
 	}
 	return version
