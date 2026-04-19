@@ -19,10 +19,10 @@ func main() {
 	// Create application with options
 	err := wails.Run(&options.App{
 		Title:     "Oso — Object Storage Operator",
-		Width:     900,
-		Height:    712,
-		MinWidth:  900,
-		MinHeight: 712,
+		Width:     1020,
+		Height:    740,
+		MinWidth:  1020,
+		MinHeight: 740,
 		Frameless: true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
