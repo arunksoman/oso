@@ -25,7 +25,7 @@ jobs:
           - name: oso
             platform: windows/amd64
             os: windows-latest
-            package: true
+            package: false
           - name: oso
             platform: darwin/universal
             os: macos-latest
@@ -71,11 +71,21 @@ jobs:
         if: runner.os == 'Linux'
         run: mv build/bin/${{ matrix.build.name }} build/bin/${{ matrix.build.name }}-linux-amd64
 
+      - name: Install NSIS (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install nsis --no-progress -y
+
+      - name: Build NSIS installer (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: wails build -nsis -skipbindings -s -ldflags "-X main.version=${{ steps.version.outputs.APP_VERSION }}"
+
       - name: Rename Windows artifacts
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          mv build/bin/${{ matrix.build.name }}.exe build/bin/${{ matrix.build.name }}-windows-amd64.exe
+          mv build/bin/${{ matrix.build.name }} build/bin/${{ matrix.build.name }}-windows-amd64.exe
           mv build/bin/${{ matrix.build.name }}-amd64-installer.exe build/bin/${{ matrix.build.name }}-windows-amd64-installer.exe
 
       - name: Package macOS app
