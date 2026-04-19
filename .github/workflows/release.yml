@@ -74,8 +74,10 @@ jobs:
 
       - name: Build NSIS installer (Windows)
         if: runner.os == 'Windows'
-        shell: bash
-        run: wails build -nsis -skipbindings -s -ldflags "-X main.version=${{ steps.version.outputs.APP_VERSION }}"
+        shell: pwsh
+        run: |
+          $env:PATH += ";C:\Program Files (x86)\NSIS"
+          wails build -nsis -skipbindings -s -ldflags "-X main.version=${{ steps.version.outputs.APP_VERSION }}"
 
       - name: List build output after NSIS (debug)
         if: runner.os == 'Windows'
@@ -86,7 +88,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          mv build/bin/${{ matrix.build.name }} build/bin/${{ matrix.build.name }}-windows-amd64.exe
+          mv build/bin/${{ matrix.build.name }}.exe build/bin/${{ matrix.build.name }}-windows-amd64.exe
           mv build/bin/${{ matrix.build.name }}-amd64-installer.exe build/bin/${{ matrix.build.name }}-windows-amd64-installer.exe
 
       - name: Package macOS app
