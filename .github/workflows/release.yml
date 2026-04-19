@@ -59,10 +59,6 @@ jobs:
           node-version: "24.x"
           go-build-flags: -ldflags "-X main.version=${{ steps.version.outputs.APP_VERSION }}"
 
-      - name: List build output (debug)
-        shell: bash
-        run: ls -laR build/bin/
-
       - name: Make Linux binary executable
         if: runner.os == 'Linux'
         run: chmod +x build/bin/${{ matrix.build.name }}
@@ -80,6 +76,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: wails build -nsis -skipbindings -s -ldflags "-X main.version=${{ steps.version.outputs.APP_VERSION }}"
+
+      - name: List build output after NSIS (debug)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: ls -laR build/bin/
 
       - name: Rename Windows artifacts
         if: runner.os == 'Windows'
