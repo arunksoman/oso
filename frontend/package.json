@@ -42,6 +42,7 @@
 	"dependencies": {
 		"@hugeicons/core-free-icons": "^4.1.1",
 		"@hugeicons/svelte": "^1.1.2",
+		"@tanstack/svelte-virtual": "^3.13.24",
 		"daisyui": "^5.5.19"
 	}
 }

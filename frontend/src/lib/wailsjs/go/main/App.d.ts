@@ -54,6 +54,8 @@ export function SaveFileDialog(arg1:string):Promise<string>;
 
 export function SaveSettings(arg1:main.AppSettings):Promise<void>;
 
+export function SearchObjects(arg1:string,arg2:string,arg3:string,arg4:number):Promise<Array<main.S3Object>>;
+
 export function UploadFile(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function UploadFiles(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;

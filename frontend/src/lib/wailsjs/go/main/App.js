@@ -106,6 +106,10 @@ export function SaveSettings(arg1) {
   return window['go']['main']['App']['SaveSettings'](arg1);
 }
 
+export function SearchObjects(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['SearchObjects'](arg1, arg2, arg3, arg4);
+}
+
 export function UploadFile(arg1, arg2, arg3) {
   return window['go']['main']['App']['UploadFile'](arg1, arg2, arg3);
 }

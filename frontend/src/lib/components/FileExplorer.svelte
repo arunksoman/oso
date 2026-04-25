@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { createVirtualizer } from '@tanstack/svelte-virtual';
   import HugeiconsIcon from '$lib/components/Icon.svelte';
   import {
     Folder01Icon,
@@ -31,9 +32,10 @@
   import { getFileIcon } from '$lib/utils/fileIcons';
   import { formatFileSize, formatDate, getFileType } from '$lib/utils/format';
 
-  // Load-more sentinel
-  let loadMoreEl = $state<HTMLDivElement | undefined>(undefined);
-  let observer: IntersectionObserver;
+  let listContainerEl = $state<HTMLDivElement | undefined>(undefined);
+  let searchResults = $state<S3Object[] | null>(null);
+  let searchBusy = $state(false);
+  let searchSeq = 0;
 
   // Context menu
   let ctxMenu = $state<{ x: number; y: number; target: S3Object | null } | null>(null);
@@ -54,6 +56,9 @@
 
     appState.isLoading = true;
     try {
+      if (reset) {
+        searchResults = null;
+      }
       const token = reset ? '' : appState.continuationToken;
       const result = await ListObjects(
         appState.currentBucket,
@@ -91,19 +96,98 @@
     }
   });
 
-  // Infinite-scroll observer
+  // Debounced server-side search. Falls back to client filter if SearchObjects is unavailable.
   $effect(() => {
-    if (!loadMoreEl) return;
-    observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && appState.hasMore && !appState.isLoading) {
-          void loadObjects(false);
+    const bucket = appState.currentBucket;
+    const prefix = appState.currentPrefix;
+    const query = appState.searchQuery.trim();
+    void prefix;
+
+    if (!bucket) {
+      searchSeq++;
+      searchBusy = false;
+      searchResults = null;
+      return;
+    }
+
+    if (!query) {
+      searchSeq++;
+      searchBusy = false;
+      searchResults = null;
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      const requestId = ++searchSeq;
+      searchBusy = true;
+      try {
+        type GoAppApi = {
+          SearchObjects?: (bucket: string, prefix: string, query: string, maxResults: number) => Promise<S3Object[]>;
+        };
+        const goApp = (window as Window & { go?: { main?: { App?: GoAppApi } } }).go?.main?.App;
+        if (!goApp?.SearchObjects) {
+          searchResults = null;
+          return;
         }
-      },
-      { threshold: 0.1 },
-    );
-    observer.observe(loadMoreEl);
-    return () => observer?.disconnect();
+        const results = await goApp.SearchObjects(bucket, appState.currentPrefix, query, 2000);
+        if (requestId !== searchSeq) return;
+        searchResults = results ?? [];
+      } catch (e) {
+        if (requestId !== searchSeq) return;
+        searchResults = [];
+        appState.notify(`Search failed: ${e}`, 'error');
+      } finally {
+        if (requestId === searchSeq) {
+          searchBusy = false;
+        }
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  });
+
+  const rowVirtualizer = createVirtualizer<HTMLDivElement, HTMLTableRowElement>({
+    count: 0,
+    getScrollElement: () => listContainerEl ?? null,
+    estimateSize: () => (appState.settings.showFileDetails ? 34 : 30),
+    overscan: 14,
+  });
+
+  let lastVirtualCount = -1;
+  let lastShowDetails = appState.settings.showFileDetails;
+
+  $effect(() => {
+    const count = filteredObjects.length;
+    const showDetails = appState.settings.showFileDetails;
+    if (count === lastVirtualCount && showDetails === lastShowDetails) {
+      return;
+    }
+    lastVirtualCount = count;
+    lastShowDetails = showDetails;
+
+    untrack(() => {
+      $rowVirtualizer.setOptions({
+        count,
+        getScrollElement: () => listContainerEl ?? null,
+        estimateSize: () => (showDetails ? 34 : 30),
+        overscan: 14,
+      });
+    });
+  });
+
+  // Virtualized infinite-loading trigger for normal browsing mode.
+  $effect(() => {
+    const query = appState.searchQuery.trim();
+    if (query) return;
+    if (!appState.hasMore || appState.isLoading) return;
+
+    const virtualItems = $rowVirtualizer.getVirtualItems();
+    if (!virtualItems.length) return;
+
+    const last = virtualItems[virtualItems.length - 1];
+    if (last.index >= filteredObjects.length - 8) {
+      untrack(() => void loadObjects(false));
+    }
   });
 
   // ─── Selection ───────────────────────────────────────────────────────────────
@@ -115,7 +199,7 @@
       s.has(key) ? s.delete(key) : s.add(key);
       appState.selectedKeys = s;
     } else if (e.shiftKey && appState.selectedKeys.size > 0) {
-      const keys = appState.objects.map((o) => o.key);
+      const keys = filteredObjects.map((o) => o.key);
       const last = [...appState.selectedKeys].pop()!;
       const a = keys.indexOf(last);
       const b = keys.indexOf(key);
@@ -136,7 +220,7 @@
   }
 
   function selectAll() {
-    appState.selectedKeys = new Set(appState.objects.map((o) => o.key));
+    appState.selectedKeys = new Set(filteredObjects.map((o) => o.key));
   }
 
   // ─── Context menu ────────────────────────────────────────────────────────────
@@ -170,7 +254,7 @@
   // ─── File operations ─────────────────────────────────────────────────────────
 
   async function doDownload(obj?: S3Object) {
-    const target = obj ?? appState.objects.find((o) => appState.selectedKeys.has(o.key) && !o.isFolder);
+    const target = obj ?? filteredObjects.find((o) => appState.selectedKeys.has(o.key) && !o.isFolder);
     if (!target || target.isFolder) return;
 
     let dest: string;
@@ -257,7 +341,7 @@
   }
 
   function doPresignedUrl(obj?: S3Object) {
-    const target = obj ?? appState.objects.find((o) => appState.selectedKeys.has(o.key) && !o.isFolder);
+    const target = obj ?? filteredObjects.find((o) => appState.selectedKeys.has(o.key) && !o.isFolder);
     if (!target || target.isFolder) return;
     appState.presignedUrlTarget = { bucket: appState.currentBucket!, key: target.key, name: target.name };
     appState.showPresignedUrl = true;
@@ -347,9 +431,12 @@
 
   const filteredObjects = $derived.by(() => {
     const q = appState.searchQuery.toLowerCase().trim();
+    if (q && searchResults !== null) return searchResults;
     if (!q) return appState.objects;
     return appState.objects.filter((o) => o.name.toLowerCase().includes(q));
   });
+
+  const virtualRows = $derived($rowVirtualizer.getVirtualItems());
 
   const allChecked = $derived(filteredObjects.length > 0 && appState.selectedKeys.size === filteredObjects.length);
   const someChecked = $derived(appState.selectedKeys.size > 0 && appState.selectedKeys.size < filteredObjects.length);
@@ -443,6 +530,9 @@
             placeholder="Filter..."
             bind:value={appState.searchQuery}
           />
+          {#if searchBusy}
+            <span class="loading loading-spinner loading-xs text-base-content/40"></span>
+          {/if}
           {#if appState.searchQuery}
             <button class="text-base-content/40 hover:text-base-content/70 text-xs" onclick={() => { appState.searchQuery = ''; }}>✕</button>
           {/if}
@@ -453,10 +543,11 @@
     <!-- File table -->
     <div
       class="flex-1 overflow-y-auto"
+      bind:this={listContainerEl}
       role="region"
       oncontextmenu={(e) => openCtx(e, null)}
     >
-      {#if appState.objects.length === 0 && !appState.isLoading}
+      {#if filteredObjects.length === 0 && !appState.isLoading && !searchBusy}
         <div
           class="flex flex-col items-center justify-center h-full gap-3 text-base-content/15 select-none"
           role="region"
@@ -473,97 +564,106 @@
           </button>
         </div>
       {:else}
-        <table class="table table-sm w-full">
-          <thead class="sticky top-0 z-10 bg-base-200">
-            <tr>
-              <th class="py-2 px-2 w-8">
-                <input
-                  type="checkbox"
-                  class="checkbox checkbox-xs checkbox-primary"
-                  checked={allChecked}
-                  indeterminate={someChecked}
-                  onchange={toggleAll}
-                />
-              </th>
-              <th class="py-2 px-2 text-xs font-semibold uppercase tracking-wider text-base-content/35 text-left w-full">Name</th>
-              {#if appState.settings.showFileDetails}
-                <th class="py-2 px-4 text-xs font-semibold uppercase tracking-wider text-base-content/35 whitespace-nowrap text-right">Size</th>
-                <th class="py-2 px-4 text-xs font-semibold uppercase tracking-wider text-base-content/35 whitespace-nowrap">Type</th>
-                <th class="py-2 px-4 text-xs font-semibold uppercase tracking-wider text-base-content/35 whitespace-nowrap">Modified</th>
-              {/if}
-              <th class="py-2 px-2 w-8"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each filteredObjects as obj (obj.key)}
-              {@const icon = getFileIcon(obj.name, obj.isFolder)}
-              {@const sel = appState.selectedKeys.has(obj.key)}
-              {@const clipped = !!appState.clipboard?.keys.includes(obj.key)}
-              <tr
-                class="cursor-pointer transition-colors group"
-                class:bg-primary={sel}
-                class:text-primary-content={sel}
-                class:opacity-50={clipped && !sel}
-                onclick={(e) => handleRowClick(e, obj)}
-                ondblclick={() => handleDblClick(obj)}
-                oncontextmenu={(e) => openCtx(e, obj)}
-              >
-                <td class="py-1.5 px-2 w-8" onclick={(e) => e.stopPropagation()}>
+        <div style="height: {$rowVirtualizer.getTotalSize()}px; position: relative;">
+          <table class="table table-sm w-full">
+            <thead class="sticky top-0 z-10 bg-base-200">
+              <tr>
+                <th class="py-2 px-2 w-8">
                   <input
                     type="checkbox"
-                    class={`checkbox checkbox-xs ${sel ? 'border-white' : 'checkbox-primary'}`}
-                    checked={sel}
-                    onchange={(e) => toggleCheck(e, obj)}
+                    class="checkbox checkbox-xs checkbox-primary"
+                    checked={allChecked}
+                    indeterminate={someChecked}
+                    onchange={toggleAll}
                   />
-                </td>
-                <td class="py-1.5 px-2">
-                  <div class="flex items-center gap-2.5">
-                    <span class={sel ? 'text-primary-content/80' : obj.isFolder ? 'text-warning/85' : 'text-base-content/60 group-hover:text-base-content/90'}>
-                      <HugeiconsIcon icon={icon} size={15} />
-                    </span>
-                    <span class="text-sm font-mono truncate" class:italic={clipped && !sel}>{obj.name}</span>
-                    {#if clipped}
-                      <span class="text-xs opacity-40 ml-1">({appState.clipboard?.operation})</span>
-                    {/if}
-                  </div>
-                </td>
+                </th>
+                <th class="py-2 px-2 text-xs font-semibold uppercase tracking-wider text-base-content/35 text-left w-full">Name</th>
                 {#if appState.settings.showFileDetails}
-                  <td class="py-1.5 px-4 text-xs font-mono text-right whitespace-nowrap">
-                    <span class:opacity-50={!sel}>{obj.isFolder ? '—' : formatFileSize(obj.size)}</span>
-                  </td>
-                  <td class="py-1.5 px-4 text-xs font-mono whitespace-nowrap">
-                    <span class:opacity-50={!sel}>{getFileType(obj.name, obj.isFolder)}</span>
-                  </td>
-                  <td class="py-1.5 px-4 text-xs font-mono whitespace-nowrap">
-                    <span class:opacity-50={!sel}>{obj.isFolder ? '—' : formatDate(obj.lastModified)}</span>
-                  </td>
+                  <th class="py-2 px-4 text-xs font-semibold uppercase tracking-wider text-base-content/35 whitespace-nowrap text-right">Size</th>
+                  <th class="py-2 px-4 text-xs font-semibold uppercase tracking-wider text-base-content/35 whitespace-nowrap">Type</th>
+                  <th class="py-2 px-4 text-xs font-semibold uppercase tracking-wider text-base-content/35 whitespace-nowrap">Modified</th>
                 {/if}
-                <td class="py-1.5 px-2 w-8">
-                  <button
-                    class="btn btn-ghost btn-xs btn-square p-0 h-6 w-6 min-h-0 opacity-0 group-hover:opacity-80 hover:opacity-100! transition-opacity"
-                    class:opacity-80={sel}
-                    class:invisible={multiSelected}
-                    onclick={(e) => openItemMenu(e, obj)}
-                    title="Actions"
-                  >
-                    <HugeiconsIcon icon={MoreVerticalIcon} size={14} />
-                  </button>
-                </td>
+                <th class="py-2 px-2 w-8"></th>
               </tr>
-            {/each}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {#each virtualRows as row, idx (row.index)}
+                {@const obj = filteredObjects[row.index]}
+                {#if obj}
+                  {@const icon = getFileIcon(obj.name, obj.isFolder)}
+                  {@const sel = appState.selectedKeys.has(obj.key)}
+                  {@const clipped = !!appState.clipboard?.keys.includes(obj.key)}
+                  <tr
+                    style="height: {row.size}px; transform: translateY({row.start - idx * row.size}px);"
+                    class="cursor-pointer transition-colors group"
+                    class:bg-primary={sel}
+                    class:text-primary-content={sel}
+                    class:opacity-50={clipped && !sel}
+                    onclick={(e) => handleRowClick(e, obj)}
+                    ondblclick={() => handleDblClick(obj)}
+                    oncontextmenu={(e) => openCtx(e, obj)}
+                  >
+                    <td class="py-1.5 px-2 w-8" onclick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        class={`checkbox checkbox-xs ${sel ? 'border-white' : 'checkbox-primary'}`}
+                        checked={sel}
+                        onchange={(e) => toggleCheck(e, obj)}
+                      />
+                    </td>
+                    <td class="py-1.5 px-2">
+                      <div class="flex items-center gap-2.5">
+                        <span class={sel ? 'text-primary-content/80' : obj.isFolder ? 'text-warning/85' : 'text-base-content/60 group-hover:text-base-content/90'}>
+                          <HugeiconsIcon icon={icon} size={15} />
+                        </span>
+                        <span class="text-sm font-mono truncate" class:italic={clipped && !sel}>{obj.name}</span>
+                        {#if clipped}
+                          <span class="text-xs opacity-40 ml-1">({appState.clipboard?.operation})</span>
+                        {/if}
+                      </div>
+                    </td>
+                    {#if appState.settings.showFileDetails}
+                      <td class="py-1.5 px-4 text-xs font-mono text-right whitespace-nowrap">
+                        <span class:opacity-50={!sel}>{obj.isFolder ? '—' : formatFileSize(obj.size)}</span>
+                      </td>
+                      <td class="py-1.5 px-4 text-xs font-mono whitespace-nowrap">
+                        <span class:opacity-50={!sel}>{getFileType(obj.name, obj.isFolder)}</span>
+                      </td>
+                      <td class="py-1.5 px-4 text-xs font-mono whitespace-nowrap">
+                        <span class:opacity-50={!sel}>{obj.isFolder ? '—' : formatDate(obj.lastModified)}</span>
+                      </td>
+                    {/if}
+                    <td class="py-1.5 px-2 w-8">
+                      <button
+                        class="btn btn-ghost btn-xs btn-square p-0 h-6 w-6 min-h-0 opacity-0 group-hover:opacity-80 hover:opacity-100! transition-opacity"
+                        class:opacity-80={sel}
+                        class:invisible={multiSelected}
+                        onclick={(e) => openItemMenu(e, obj)}
+                        title="Actions"
+                      >
+                        <HugeiconsIcon icon={MoreVerticalIcon} size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                {/if}
+              {/each}
+            </tbody>
+          </table>
+        </div>
 
-        <!-- Infinite scroll sentinel -->
-        <div bind:this={loadMoreEl} class="py-5 flex justify-center">
+        <div class="py-5 flex justify-center">
           {#if appState.isLoading}
             <span class="loading loading-spinner loading-xs text-primary/40"></span>
+          {:else if searchBusy}
+            <span class="loading loading-spinner loading-xs text-base-content/40"></span>
+          {:else if appState.searchQuery.trim() && searchResults !== null}
+            <span class="text-xs text-base-content/30">{filteredObjects.length} match(es)</span>
           {:else if appState.hasMore}
             <button class="btn btn-ghost btn-xs text-base-content/30" onclick={() => loadObjects(false)}>
               Load more
             </button>
-          {:else if appState.objects.length > 0}
-            <span class="text-xs text-base-content/15">{appState.objects.length} items</span>
+          {:else if filteredObjects.length > 0}
+            <span class="text-xs text-base-content/15">{filteredObjects.length} items</span>
           {/if}
         </div>
       {/if}
