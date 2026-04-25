@@ -41,6 +41,12 @@ export interface UploadEntry {
   error?: string;
 }
 
+export interface UploadBatch {
+  total: number;
+  done: number;
+  errors: number;
+}
+
 export type ClipboardEntry = {
   operation: 'copy' | 'cut';
   bucket: string;
@@ -75,6 +81,9 @@ class AppState {
 
   // Upload progress tracking
   uploads = $state<Record<string, UploadEntry>>({});
+
+  // Batch upload progress (multi-file only)
+  uploadBatch = $state<UploadBatch | null>(null);
 
   // Application settings
   settings = $state<AppSettings>({

@@ -285,10 +285,20 @@
     try {
       const files = await OpenMultipleFilesDialog();
       if (!files?.length) return;
+
+      if (files.length > 1) {
+        // Batch mode: panel handles progress + completion feedback
+        appState.uploadBatch = { total: files.length, done: 0, errors: 0 };
+      }
+
       await UploadFiles(appState.currentBucket, appState.currentPrefix, files);
-      appState.notify(`Uploaded ${files.length} file(s)`, 'success');
+
+      if (files.length === 1) {
+        appState.notify(`Uploaded "${files[0].split('/').pop()}"`, 'success');
+      }
       appState.refreshTrigger = Date.now();
     } catch (e) {
+      appState.uploadBatch = null;
       appState.notify(`Upload failed: ${e}`, 'error');
     }
     closeCtx();

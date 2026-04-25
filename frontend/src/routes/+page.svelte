@@ -23,7 +23,7 @@
       appState.connected = connected;
       if (connected) {
         const s = await GetSettings();
-        appState.settings = s;
+        appState.settings = { ...appState.settings, ...s };
       }
     } catch (e) {
       console.error('Startup error:', e);
@@ -44,11 +44,25 @@
         ...appState.uploads,
         [data.key]: { key: data.key, progress: 100, done: true },
       };
-      setTimeout(() => {
-        const u = { ...appState.uploads };
-        delete u[data.key];
-        appState.uploads = u;
-      }, 4000);
+
+      if (appState.uploadBatch) {
+        const next = { ...appState.uploadBatch, done: appState.uploadBatch.done + 1 };
+        appState.uploadBatch = next;
+        if (next.done + next.errors >= next.total) {
+          // All files finished — hold for 2s then clear
+          setTimeout(() => {
+            appState.uploadBatch = null;
+            appState.uploads = {};
+          }, 2000);
+        }
+      } else {
+        // Single file: remove entry after a short delay
+        setTimeout(() => {
+          const u = { ...appState.uploads };
+          delete u[data.key];
+          appState.uploads = u;
+        }, 4000);
+      }
     });
 
     EventsOn('upload:error', (data: { key: string; error: string }) => {
@@ -56,6 +70,17 @@
         ...appState.uploads,
         [data.key]: { key: data.key, progress: 0, done: false, error: data.error },
       };
+
+      if (appState.uploadBatch) {
+        const next = { ...appState.uploadBatch, errors: appState.uploadBatch.errors + 1 };
+        appState.uploadBatch = next;
+        if (next.done + next.errors >= next.total) {
+          setTimeout(() => {
+            appState.uploadBatch = null;
+            appState.uploads = {};
+          }, 2000);
+        }
+      }
     });
   });
 </script>
