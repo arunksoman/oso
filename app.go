@@ -23,8 +23,8 @@ import (
 // version is set at build time via -ldflags "-X main.version=x.y.z"
 var version = "dev"
 
-//go:embed version.json
-var versionJSON []byte
+//go:embed wails.json
+var wailsJSON []byte
 
 // App struct
 type App struct {
@@ -112,12 +112,14 @@ func (a *App) GetVersion() string {
 	if version != "dev" {
 		return version
 	}
-	// Fallback: read from embedded version.json
-	var v struct {
-		Version string `json:"version"`
+	// Fallback: read productVersion from embedded wails.json
+	var w struct {
+		Info struct {
+			ProductVersion string `json:"productVersion"`
+		} `json:"info"`
 	}
-	if json.Unmarshal(versionJSON, &v) == nil && v.Version != "" {
-		return v.Version
+	if json.Unmarshal(wailsJSON, &w) == nil && w.Info.ProductVersion != "" {
+		return w.Info.ProductVersion
 	}
 	return version
 }
