@@ -43,5 +43,11 @@
 		"@hugeicons/core-free-icons": "^4.1.1",
 		"@hugeicons/svelte": "^1.1.2",
 		"daisyui": "^5.5.19"
+	},
+	"pnpm": {
+		"overrides": {
+			"@tailwindcss/vite": "4.2.2",
+			"tailwindcss": "4.2.2"
+		}
 	}
 }
