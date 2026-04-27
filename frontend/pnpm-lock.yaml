@@ -14,6 +14,9 @@ importers:
       '@hugeicons/svelte':
         specifier: ^1.1.2
         version: 1.1.2(svelte@5.55.4(@typescript-eslint/types@8.58.2))
+      '@tanstack/svelte-virtual':
+        specifier: ^3.13.24
+        version: 3.13.24(svelte@5.55.4(@typescript-eslint/types@8.58.2))
       daisyui:
         specifier: ^5.5.19
         version: 5.5.19
@@ -464,6 +467,14 @@ packages:
     resolution: {integrity: sha512-pCvohwOCspk3ZFn6eJzrrX3g4n2JY73H6MmYC87XfGPyTty4YsCjYTMArRZm/zOI8dIt3+EcrLHAFPe5A4bgtw==}
     peerDependencies:
       vite: ^5.2.0 || ^6 || ^7 || ^8
+
+  '@tanstack/svelte-virtual@3.13.24':
+    resolution: {integrity: sha512-Up3LOD5Cj+oJ3GuKfM1Li06jzzZMIZnRPmu3aik9rJQgk7jq7LgPo4yumfUw4+I4edjYfyPKSZnXGwZ9Vjlebw==}
+    peerDependencies:
+      svelte: ^3.48.0 || ^4.0.0 || ^5.0.0
+
+  '@tanstack/virtual-core@3.14.0':
+    resolution: {integrity: sha512-JLANqGy/D6k4Ujmh8Tr25lGimuOXNiaVyXaCAZS0W+1390sADdGnyUdSWNIfd49gebtIxGMij4IktRVzrdr12Q==}
 
   '@tybys/wasm-util@0.10.1':
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
@@ -1665,6 +1676,13 @@ snapshots:
       '@tailwindcss/oxide': 4.2.4
       tailwindcss: 4.2.4
       vite: 8.0.8(@types/node@22.19.17)(jiti@2.6.1)
+
+  '@tanstack/svelte-virtual@3.13.24(svelte@5.55.4(@typescript-eslint/types@8.58.2))':
+    dependencies:
+      '@tanstack/virtual-core': 3.14.0
+      svelte: 5.55.4(@typescript-eslint/types@8.58.2)
+
+  '@tanstack/virtual-core@3.14.0': {}
 
   '@tybys/wasm-util@0.10.1':
     dependencies:
