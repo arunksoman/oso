@@ -2,5 +2,6 @@ packages:
   - "."
 
 onlyBuiltDependencies:
+  - '@hugeicons/svelte'
   - "@tailwindcss/oxide"
   - esbuild
