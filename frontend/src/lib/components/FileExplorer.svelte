@@ -26,6 +26,7 @@
     MoveFolder,
     OpenMultipleFilesDialog,
     UploadFiles,
+    SearchObjects,
   } from '$lib/wailsjs/go/main/App';
   import { appState } from '$lib/stores/appState.svelte';
   import type { S3Object } from '$lib/stores/appState.svelte';
@@ -121,15 +122,7 @@
       const requestId = ++searchSeq;
       searchBusy = true;
       try {
-        type GoAppApi = {
-          SearchObjects?: (bucket: string, prefix: string, query: string, maxResults: number) => Promise<S3Object[]>;
-        };
-        const goApp = (window as Window & { go?: { main?: { App?: GoAppApi } } }).go?.main?.App;
-        if (!goApp?.SearchObjects) {
-          searchResults = null;
-          return;
-        }
-        const results = await goApp.SearchObjects(bucket, appState.currentPrefix, query, 2000);
+        const results = await SearchObjects(bucket, appState.currentPrefix, query, 2000);
         if (requestId !== searchSeq) return;
         searchResults = results ?? [];
       } catch (e) {
