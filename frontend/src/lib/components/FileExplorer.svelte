@@ -67,7 +67,7 @@
         appState.currentBucket,
         appState.currentPrefix,
         token,
-        10000,
+        100,
       );
       appState.objects = reset ? (result.objects ?? []) : [...appState.objects, ...(result.objects ?? [])];
       appState.continuationToken = result.nextContinuationToken ?? '';
