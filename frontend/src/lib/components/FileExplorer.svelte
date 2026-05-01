@@ -25,6 +25,8 @@
     MoveObject,
     MoveFolder,
     OpenMultipleFilesDialog,
+    OpenDirectoryDialog,
+    UploadFile,
     UploadFiles,
     SearchObjects,
   } from '$lib/wailsjs/go/main/App';
@@ -65,7 +67,7 @@
         appState.currentBucket,
         appState.currentPrefix,
         token,
-        100,
+        10000,
       );
       appState.objects = reset ? (result.objects ?? []) : [...appState.objects, ...(result.objects ?? [])];
       appState.continuationToken = result.nextContinuationToken ?? '';
@@ -357,6 +359,20 @@
     }
   }
 
+  async function doUploadFolder() {
+    if (!appState.currentBucket) return;
+    try {
+      const dir = await OpenDirectoryDialog();
+      if (!dir) return;
+      // upload:folder:start event will set uploadBatch; batch panel handles completion
+      await UploadFile(appState.currentBucket, appState.currentPrefix, dir);
+    } catch (e) {
+      appState.notify(`Upload failed: ${e}`, 'error');
+      appState.uploadBatch = null;
+    }
+    closeCtx();
+  }
+
   async function doUpload() {
     if (!appState.currentBucket) return;
     try {
@@ -643,22 +659,23 @@
             </tbody>
           </table>
         </div>
+      {/if}
+    </div>
 
-        <div class="py-5 flex justify-center">
-          {#if appState.isLoading}
-            <span class="loading loading-spinner loading-xs text-primary/40"></span>
-          {:else if searchBusy}
-            <span class="loading loading-spinner loading-xs text-base-content/40"></span>
-          {:else if appState.searchQuery.trim() && searchResults !== null}
-            <span class="text-xs text-base-content/30">{filteredObjects.length} match(es)</span>
-          {:else if appState.hasMore}
-            <button class="btn btn-ghost btn-xs text-base-content/30" onclick={() => loadObjects(false)}>
-              Load more
-            </button>
-          {:else if filteredObjects.length > 0}
-            <span class="text-xs text-base-content/15">{filteredObjects.length} items</span>
-          {/if}
-        </div>
+    <!-- Status bar — outside the scroll container so it always sits at the bottom -->
+    <div class="py-2 flex justify-center border-t border-base-300 shrink-0 min-h-8">
+      {#if appState.isLoading}
+        <span class="loading loading-spinner loading-xs text-primary/40"></span>
+      {:else if searchBusy}
+        <span class="loading loading-spinner loading-xs text-base-content/40"></span>
+      {:else if appState.searchQuery.trim() && searchResults !== null}
+        <span class="text-xs text-base-content/30">{filteredObjects.length} match(es)</span>
+      {:else if appState.hasMore}
+        <button class="btn btn-ghost btn-xs text-base-content/30" onclick={() => loadObjects(false)}>
+          Load more
+        </button>
+      {:else if filteredObjects.length > 0}
+        <span class="text-xs text-base-content/15">{filteredObjects.length} items</span>
       {/if}
     </div>
   {/if}
@@ -725,6 +742,10 @@
       <button class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left" onclick={doUpload}>
         <HugeiconsIcon icon={Upload01Icon} size={14} class="text-base-content/60" />
         Upload files
+      </button>
+      <button class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left" onclick={doUploadFolder}>
+        <HugeiconsIcon icon={FolderAddIcon} size={14} class="text-base-content/60" />
+        Upload folder
       </button>
       {#if appState.clipboard}
         <div class="h-px bg-base-300 my-1"></div>

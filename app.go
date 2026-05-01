@@ -685,27 +685,17 @@ func (a *App) DownloadObject(bucket, key, destPath string) error {
 	return err
 }
 
-// UploadFile uploads a local file to S3, emitting progress events
-func (a *App) UploadFile(bucket, prefix, localPath string) error {
-	if a.s3Client == nil {
-		return fmt.Errorf("not connected to S3")
-	}
-	fi, err := os.Stat(localPath)
-	if err != nil {
-		return err
-	}
+// uploadFileWithKey uploads a single local file to S3 under the given key, emitting progress events.
+func (a *App) uploadFileWithKey(bucket, key, localPath string, size int64) error {
 	f, err := os.Open(localPath)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	fileName := filepath.Base(localPath)
-	key := prefix + fileName
-
 	pr := &progressReader{
 		r:     f,
-		total: fi.Size(),
+		total: size,
 		ctx:   a.ctx,
 		key:   key,
 	}
@@ -714,7 +704,7 @@ func (a *App) UploadFile(bucket, prefix, localPath string) error {
 		Bucket:        aws.String(bucket),
 		Key:           aws.String(key),
 		Body:          pr,
-		ContentLength: aws.Int64(fi.Size()),
+		ContentLength: aws.Int64(size),
 	})
 	if err != nil {
 		runtime.EventsEmit(a.ctx, "upload:error", map[string]interface{}{
@@ -726,7 +716,55 @@ func (a *App) UploadFile(bucket, prefix, localPath string) error {
 	return nil
 }
 
-// UploadFiles uploads multiple local files sequentially
+// uploadFolderContents recursively uploads a local directory to S3, preserving structure.
+func (a *App) uploadFolderContents(bucket, s3Prefix, localFolderPath string) error {
+	folderName := filepath.Base(localFolderPath)
+	destPrefix := s3Prefix + folderName + "/"
+
+	// Count files first so the frontend can show a progress bar.
+	total := 0
+	_ = filepath.Walk(localFolderPath, func(_ string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() {
+			total++
+		}
+		return nil
+	})
+	runtime.EventsEmit(a.ctx, "upload:folder:start", map[string]interface{}{"total": total})
+
+	return filepath.Walk(localFolderPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		relPath, err := filepath.Rel(localFolderPath, path)
+		if err != nil {
+			return err
+		}
+		s3Key := destPrefix + filepath.ToSlash(relPath)
+		return a.uploadFileWithKey(bucket, s3Key, path, info.Size())
+	})
+}
+
+// UploadFile uploads a local file (or folder) to S3, emitting progress events.
+func (a *App) UploadFile(bucket, prefix, localPath string) error {
+	if a.s3Client == nil {
+		return fmt.Errorf("not connected to S3")
+	}
+	fi, err := os.Stat(localPath)
+	if err != nil {
+		return err
+	}
+	if fi.IsDir() {
+		return a.uploadFolderContents(bucket, prefix, localPath)
+	}
+
+	key := prefix + filepath.Base(localPath)
+	return a.uploadFileWithKey(bucket, key, localPath, fi.Size())
+}
+
+// UploadFiles uploads multiple local files or folders sequentially.
 func (a *App) UploadFiles(bucket, prefix string, localPaths []string) error {
 	for _, path := range localPaths {
 		if err := a.UploadFile(bucket, prefix, path); err != nil {

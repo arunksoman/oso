@@ -8,11 +8,30 @@
     FolderAddIcon,
     Settings01Icon,
   } from '@hugeicons/core-free-icons';
-  import { OpenMultipleFilesDialog, UploadFiles } from '$lib/wailsjs/go/main/App';
+  import { OpenMultipleFilesDialog, UploadFiles, OpenDirectoryDialog, UploadFile } from '$lib/wailsjs/go/main/App';
   import { appState } from '$lib/stores/appState.svelte';
   import Breadcrumb from './Breadcrumb.svelte';
 
   let uploading = $state(false);
+
+  async function handleUploadFolder() {
+    if (!appState.currentBucket) {
+      appState.notify('Select a bucket first', 'error');
+      return;
+    }
+    try {
+      const dir = await OpenDirectoryDialog();
+      if (!dir) return;
+      uploading = true;
+      // upload:folder:start event will set uploadBatch; batch panel handles completion
+      await UploadFile(appState.currentBucket, appState.currentPrefix, dir);
+    } catch (e) {
+      appState.notify(`Upload failed: ${e}`, 'error');
+      appState.uploadBatch = null;
+    } finally {
+      uploading = false;
+    }
+  }
 
   async function handleUpload() {
     if (!appState.currentBucket) {
@@ -114,19 +133,38 @@
         <HugeiconsIcon icon={FolderAddIcon} size={16} />
       </button>
 
-      <button
-        class="btn btn-primary btn-xs gap-1 h-7 min-h-0 px-3 ml-1 text-xs font-medium"
-        onclick={handleUpload}
-        disabled={!appState.currentBucket || uploading}
-        title="Upload files"
-      >
-        {#if uploading}
-          <span class="loading loading-spinner loading-xs"></span>
-        {:else}
-          <HugeiconsIcon icon={Upload01Icon} size={15} />
-        {/if}
-        Upload
-      </button>
+      <div class="dropdown dropdown-end ml-1" style="--wails-draggable: no-drag">
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+        <div
+          tabindex="0"
+          role="button"
+          class="btn btn-primary btn-xs gap-1 h-7 min-h-0 px-3 text-xs font-medium"
+          class:opacity-50={!appState.currentBucket || uploading}
+          class:pointer-events-none={!appState.currentBucket || uploading}
+        >
+          {#if uploading}
+            <span class="loading loading-spinner loading-xs"></span>
+          {:else}
+            <HugeiconsIcon icon={Upload01Icon} size={15} />
+          {/if}
+          Upload
+        </div>
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+        <ul tabindex="-1" class="dropdown-content menu bg-base-200 border border-base-300 rounded-box shadow-lg z-50 w-44 p-1 mt-1">
+          <li>
+            <button class="text-sm flex items-center gap-2" onclick={handleUpload}>
+              <HugeiconsIcon icon={Upload01Icon} size={14} />
+              Upload files
+            </button>
+          </li>
+          <li>
+            <button class="text-sm flex items-center gap-2" onclick={handleUploadFolder}>
+              <HugeiconsIcon icon={FolderAddIcon} size={14} />
+              Upload folder
+            </button>
+          </li>
+        </ul>
+      </div>
 
       <button
         class="btn btn-ghost btn-xs p-1 h-auto min-h-0 text-base-content/50 hover:text-base-content ml-1"

@@ -32,7 +32,13 @@
     }
 
     // Upload event listeners
+    EventsOn('upload:folder:start', (data: { total: number }) => {
+      appState.uploadBatch = { total: data.total, done: 0, errors: 0 };
+    });
+
     EventsOn('upload:progress', (data: { key: string; progress: number }) => {
+      // In batch mode the batch bar handles progress — skip individual entries
+      if (appState.uploadBatch) return;
       appState.uploads = {
         ...appState.uploads,
         [data.key]: { key: data.key, progress: data.progress, done: false },
@@ -40,47 +46,47 @@
     });
 
     EventsOn('upload:done', (data: { key: string }) => {
-      appState.uploads = {
-        ...appState.uploads,
-        [data.key]: { key: data.key, progress: 100, done: true },
-      };
-
       if (appState.uploadBatch) {
         const next = { ...appState.uploadBatch, done: appState.uploadBatch.done + 1 };
         appState.uploadBatch = next;
         if (next.done + next.errors >= next.total) {
-          // All files finished — hold for 2s then clear
+          // All files finished — refresh listing, hold for 2s then clear
+          appState.refreshTrigger = Date.now();
           setTimeout(() => {
             appState.uploadBatch = null;
-            appState.uploads = {};
           }, 2000);
         }
-      } else {
-        // Single file: remove entry after a short delay
-        setTimeout(() => {
-          const u = { ...appState.uploads };
-          delete u[data.key];
-          appState.uploads = u;
-        }, 4000);
+        return;
       }
+      // Single file mode
+      appState.uploads = {
+        ...appState.uploads,
+        [data.key]: { key: data.key, progress: 100, done: true },
+      };
+      setTimeout(() => {
+        const u = { ...appState.uploads };
+        delete u[data.key];
+        appState.uploads = u;
+      }, 4000);
     });
 
     EventsOn('upload:error', (data: { key: string; error: string }) => {
-      appState.uploads = {
-        ...appState.uploads,
-        [data.key]: { key: data.key, progress: 0, done: false, error: data.error },
-      };
-
       if (appState.uploadBatch) {
         const next = { ...appState.uploadBatch, errors: appState.uploadBatch.errors + 1 };
         appState.uploadBatch = next;
         if (next.done + next.errors >= next.total) {
+          appState.refreshTrigger = Date.now();
           setTimeout(() => {
             appState.uploadBatch = null;
-            appState.uploads = {};
           }, 2000);
         }
+        return;
       }
+      // Single file mode — show error entry in panel
+      appState.uploads = {
+        ...appState.uploads,
+        [data.key]: { key: data.key, progress: 0, done: false, error: data.error },
+      };
     });
   });
 </script>
