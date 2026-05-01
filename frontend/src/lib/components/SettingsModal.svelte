@@ -133,10 +133,22 @@
           <!-- Display -->
           <div class="border-t border-base-300 pt-4">
             <p class="text-xs font-bold uppercase tracking-widest text-base-content/30 mb-3">Display</p>
-            <label class="flex items-center gap-2.5 cursor-pointer select-none">
+            <label class="flex items-center gap-2.5 cursor-pointer select-none mb-4">
               <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" bind:checked={settings.showFileDetails} />
               <span class="text-sm">Show file details (size, type, modified)</span>
             </label>
+            <div class="flex flex-col gap-1.5">
+              <label for="settings-page-size" class="text-sm">Items per page</label>
+              <select id="settings-page-size" class="select select-bordered select-sm bg-base-100 w-36" bind:value={settings.pageSize}>
+                <option value={100}>100</option>
+                <option value={250}>250</option>
+                <option value={500}>500</option>
+                <option value={1000}>1000</option>
+              </select>
+              <p class="text-xs text-base-content/40">
+                Number of items fetched per scroll page. S3 caps each API request at 1000 — larger values mean fewer round-trips but slower initial loads in big buckets.
+              </p>
+            </div>
           </div>
 
           <div class="flex justify-end gap-2 pt-1 border-t border-base-300">

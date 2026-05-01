@@ -67,7 +67,7 @@
         appState.currentBucket,
         appState.currentPrefix,
         token,
-        100,
+        appState.settings.pageSize || 1000,
       );
       appState.objects = reset ? (result.objects ?? []) : [...appState.objects, ...(result.objects ?? [])];
       appState.continuationToken = result.nextContinuationToken ?? '';

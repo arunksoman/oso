@@ -47,6 +47,7 @@ type AppSettings struct {
 	DefaultDownloadPath string `json:"defaultDownloadPath"`
 	AskBeforeDownload   bool   `json:"askBeforeDownload"`
 	ShowFileDetails     bool   `json:"showFileDetails"`
+	PageSize            int32  `json:"pageSize"`
 }
 
 // Bucket represents an S3 bucket
@@ -259,6 +260,7 @@ func (a *App) GetSettings() AppSettings {
 			DefaultDownloadPath: filepath.Join(home, "Downloads"),
 			AskBeforeDownload:   true,
 			ShowFileDetails:     true,
+			PageSize:            1000,
 		}
 	}
 	var settings AppSettings
@@ -268,7 +270,11 @@ func (a *App) GetSettings() AppSettings {
 			DefaultDownloadPath: filepath.Join(home, "Downloads"),
 			AskBeforeDownload:   true,
 			ShowFileDetails:     true,
+			PageSize:            1000,
 		}
+	}
+	if settings.PageSize <= 0 {
+		settings.PageSize = 1000
 	}
 	return settings
 }
