@@ -12,6 +12,7 @@ export interface AppSettings {
   askBeforeDownload: boolean;
   showFileDetails: boolean;
   theme: 'night' | 'light';
+  pageSize: number;
 }
 
 export interface Bucket {
@@ -91,6 +92,7 @@ class AppState {
     askBeforeDownload: true,
     showFileDetails: true,
     theme: 'night',
+    pageSize: 1000,
   });
 
   // Modal visibility

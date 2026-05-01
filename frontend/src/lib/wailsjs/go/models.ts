@@ -4,6 +4,7 @@ export namespace main {
 	    defaultDownloadPath: string;
 	    askBeforeDownload: boolean;
 	    showFileDetails: boolean;
+	    pageSize: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppSettings(source);
@@ -14,6 +15,7 @@ export namespace main {
 	        this.defaultDownloadPath = source["defaultDownloadPath"];
 	        this.askBeforeDownload = source["askBeforeDownload"];
 	        this.showFileDetails = source["showFileDetails"];
+	        this.pageSize = source["pageSize"];
 	    }
 	}
 	export class Bucket {
