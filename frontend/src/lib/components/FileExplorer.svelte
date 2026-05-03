@@ -1,20 +1,8 @@
-<script lang="ts">
-  import { untrack } from 'svelte';
-  import { createVirtualizer } from '@tanstack/svelte-virtual';
-  import HugeiconsIcon from '$lib/components/Icon.svelte';
-  import {
-    Folder01Icon,
-    Delete02Icon,
-    Download01Icon,
-    Copy01Icon,
-    Scissor01Icon,
-    FilePasteIcon,
-    Link03Icon,
-    FolderAddIcon,
-    Upload01Icon,
-    MoreVerticalIcon,
-    Search01Icon,
-  } from '@hugeicons/core-free-icons';
+﻿<script lang="ts">
+  import { untrack } from "svelte";
+  import { createVirtualizer } from "@tanstack/svelte-virtual";
+  import HugeiconsIcon from "$lib/components/Icon.svelte";
+  import { Folder01Icon } from "@hugeicons/core-free-icons";
   import {
     ListObjects,
     DownloadObject,
@@ -29,11 +17,15 @@
     UploadFile,
     UploadFiles,
     SearchObjects,
-  } from '$lib/wailsjs/go/main/App';
-  import { appState } from '$lib/stores/appState.svelte';
-  import type { S3Object } from '$lib/stores/appState.svelte';
-  import { getFileIcon } from '$lib/utils/fileIcons';
-  import { formatFileSize, formatDate, getFileType } from '$lib/utils/format';
+  } from "$lib/wailsjs/go/main/App";
+  import { appState } from "$lib/stores/appState.svelte";
+  import type { S3Object } from "$lib/stores/appState.svelte";
+  import NewFolderBar from "./explorer/NewFolderBar.svelte";
+  import ClipboardBar from "./explorer/ClipboardBar.svelte";
+  import FileActionBar from "./explorer/FileActionBar.svelte";
+  import FileTable from "./explorer/FileTable.svelte";
+  import FileContextMenu from "./explorer/FileContextMenu.svelte";
+  import FileStatusBar from "./explorer/FileStatusBar.svelte";
 
   let listContainerEl = $state<HTMLDivElement | undefined>(undefined);
   let searchResults = $state<S3Object[] | null>(null);
@@ -44,13 +36,10 @@
   let ctxMenu = $state<{ x: number; y: number; target: S3Object | null } | null>(null);
 
   // New-folder input
-  let newFolderName = $state('');
+  let newFolderName = $state("");
   let creatingFolder = $state(false);
 
-  /** Svelte action: focus element on mount */
-  function focus(node: HTMLElement) { node.focus(); }
-
-  // ─── Data loading ────────────────────────────────────────────────────────────
+  // Data loading
 
   async function loadObjects(reset = false) {
     if (!appState.currentBucket) return;
@@ -62,18 +51,20 @@
       if (reset) {
         searchResults = null;
       }
-      const token = reset ? '' : appState.continuationToken;
+      const token = reset ? "" : appState.continuationToken;
       const result = await ListObjects(
         appState.currentBucket,
         appState.currentPrefix,
         token,
         appState.settings.pageSize || 1000,
       );
-      appState.objects = reset ? (result.objects ?? []) : [...appState.objects, ...(result.objects ?? [])];
-      appState.continuationToken = result.nextContinuationToken ?? '';
+      appState.objects = reset
+        ? (result.objects ?? [])
+        : [...appState.objects, ...(result.objects ?? [])];
+      appState.continuationToken = result.nextContinuationToken ?? "";
       appState.hasMore = result.hasMore ?? false;
     } catch (e) {
-      appState.notify(`Load failed: ${e}`, 'error');
+      appState.notify(`Load failed: ${e}`, "error");
     } finally {
       appState.isLoading = false;
     }
@@ -82,7 +73,7 @@
   // Trigger full reload when bucket / prefix changes
   $effect(() => {
     const bucket = appState.currentBucket;
-    const prefix = appState.currentPrefix; // track both
+    const prefix = appState.currentPrefix;
     void prefix;
     if (bucket !== null && bucket !== undefined) {
       untrack(() => void loadObjects(true));
@@ -99,7 +90,7 @@
     }
   });
 
-  // Debounced server-side search. Falls back to client filter if SearchObjects is unavailable.
+  // Debounced server-side search
   $effect(() => {
     const bucket = appState.currentBucket;
     const prefix = appState.currentPrefix;
@@ -130,7 +121,7 @@
       } catch (e) {
         if (requestId !== searchSeq) return;
         searchResults = [];
-        appState.notify(`Search failed: ${e}`, 'error');
+        appState.notify(`Search failed: ${e}`, "error");
       } finally {
         if (requestId === searchSeq) {
           searchBusy = false;
@@ -170,7 +161,7 @@
     });
   });
 
-  // Virtualized infinite-loading trigger for normal browsing mode.
+  // Virtualized infinite-loading trigger
   $effect(() => {
     const query = appState.searchQuery.trim();
     if (query) return;
@@ -185,7 +176,7 @@
     }
   });
 
-  // ─── Selection ───────────────────────────────────────────────────────────────
+  // Selection
 
   function handleRowClick(e: MouseEvent, obj: S3Object) {
     const key = obj.key;
@@ -201,24 +192,23 @@
       const range = keys.slice(Math.min(a, b), Math.max(a, b) + 1);
       appState.selectedKeys = new Set([...appState.selectedKeys, ...range]);
     }
-    // Plain click without modifier does nothing — use checkbox or Ctrl+click
   }
 
   function handleDblClick(obj: S3Object) {
     if (!obj.isFolder) return;
     appState.currentPrefix = obj.key;
     appState.objects = [];
-    appState.continuationToken = '';
+    appState.continuationToken = "";
     appState.hasMore = false;
     appState.selectedKeys = new Set();
-    appState.searchQuery = '';
+    appState.searchQuery = "";
   }
 
   function selectAll() {
     appState.selectedKeys = new Set(filteredObjects.map((o) => o.key));
   }
 
-  // ─── Context menu ────────────────────────────────────────────────────────────
+  // Context menu
 
   function openCtx(e: MouseEvent, target: S3Object | null) {
     e.preventDefault();
@@ -233,7 +223,7 @@
     e.stopPropagation();
     e.preventDefault();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const menuW = 192; // min-w-48 = 12rem ≈ 192px
+    const menuW = 192;
     let x = rect.left - menuW;
     if (x < 0) x = rect.right;
     ctxMenu = { x, y: rect.bottom, target: obj };
@@ -246,10 +236,11 @@
     ctxMenu = null;
   }
 
-  // ─── File operations ─────────────────────────────────────────────────────────
+  // File operations
 
   async function doDownload(obj?: S3Object) {
-    const target = obj ?? filteredObjects.find((o) => appState.selectedKeys.has(o.key) && !o.isFolder);
+    const target =
+      obj ?? filteredObjects.find((o) => appState.selectedKeys.has(o.key) && !o.isFolder);
     if (!target || target.isFolder) return;
 
     let dest: string;
@@ -261,9 +252,9 @@
     }
     try {
       await DownloadObject(appState.currentBucket!, target.key, dest);
-      appState.notify(`Downloaded "${target.name}"`, 'success');
+      appState.notify(`Downloaded "${target.name}"`, "success");
     } catch (e) {
-      appState.notify(`Download failed: ${e}`, 'error');
+      appState.notify(`Download failed: ${e}`, "error");
     }
     closeCtx();
   }
@@ -271,7 +262,7 @@
   function doDelete() {
     const selected = [...appState.selectedKeys];
     if (selected.length === 0) return;
-    const hasFolder = selected.some((k) => k.endsWith('/'));
+    const hasFolder = selected.some((k) => k.endsWith("/"));
     appState.deleteTarget = { bucket: appState.currentBucket!, keys: selected, hasFolder };
     appState.showDeleteConfirm = true;
     closeCtx();
@@ -280,16 +271,16 @@
   function doCopy() {
     const selected = [...appState.selectedKeys];
     if (!selected.length || !appState.currentBucket) return;
-    appState.clipboard = { operation: 'copy', bucket: appState.currentBucket, keys: selected };
-    appState.notify(`${selected.length} item(s) copied`, 'info');
+    appState.clipboard = { operation: "copy", bucket: appState.currentBucket, keys: selected };
+    appState.notify(`${selected.length} item(s) copied`, "info");
     closeCtx();
   }
 
   function doCut() {
     const selected = [...appState.selectedKeys];
     if (!selected.length || !appState.currentBucket) return;
-    appState.clipboard = { operation: 'cut', bucket: appState.currentBucket, keys: selected };
-    appState.notify(`${selected.length} item(s) cut`, 'info');
+    appState.clipboard = { operation: "cut", bucket: appState.currentBucket, keys: selected };
+    appState.notify(`${selected.length} item(s) cut`, "info");
     closeCtx();
   }
 
@@ -300,18 +291,18 @@
     let failed = 0;
     for (const key of keys) {
       try {
-        const isFolder = key.endsWith('/');
-        const name = key.split('/').filter(Boolean).pop() ?? key;
+        const isFolder = key.endsWith("/");
+        const name = key.split("/").filter(Boolean).pop() ?? key;
         if (isFolder) {
-          const dstPrefix = appState.currentPrefix + name + '/';
-          if (operation === 'copy') {
+          const dstPrefix = appState.currentPrefix + name + "/";
+          if (operation === "copy") {
             await CopyFolder(src, key, appState.currentBucket, dstPrefix);
           } else {
             await MoveFolder(src, key, appState.currentBucket, dstPrefix);
           }
         } else {
           const dstKey = appState.currentPrefix + name;
-          if (operation === 'copy') {
+          if (operation === "copy") {
             await CopyObject(src, key, appState.currentBucket, dstKey);
           } else {
             await MoveObject(src, key, appState.currentBucket, dstKey);
@@ -323,22 +314,27 @@
         failed++;
       }
     }
-    if (operation === 'cut') appState.clipboard = null;
+    if (operation === "cut") appState.clipboard = null;
     if (failed === 0) {
-      appState.notify(`Pasted ${succeeded} item(s)`, 'success');
+      appState.notify(`Pasted ${succeeded} item(s)`, "success");
     } else if (succeeded > 0) {
-      appState.notify(`Pasted ${succeeded} item(s), ${failed} failed`, 'warning');
+      appState.notify(`Pasted ${succeeded} item(s), ${failed} failed`, "warning");
     } else {
-      appState.notify(`Paste failed for all ${failed} item(s)`, 'error');
+      appState.notify(`Paste failed for all ${failed} item(s)`, "error");
     }
     appState.refreshTrigger = Date.now();
     closeCtx();
   }
 
   function doPresignedUrl(obj?: S3Object) {
-    const target = obj ?? filteredObjects.find((o) => appState.selectedKeys.has(o.key) && !o.isFolder);
+    const target =
+      obj ?? filteredObjects.find((o) => appState.selectedKeys.has(o.key) && !o.isFolder);
     if (!target || target.isFolder) return;
-    appState.presignedUrlTarget = { bucket: appState.currentBucket!, key: target.key, name: target.name };
+    appState.presignedUrlTarget = {
+      bucket: appState.currentBucket!,
+      key: target.key,
+      name: target.name,
+    };
     appState.showPresignedUrl = true;
     closeCtx();
   }
@@ -348,12 +344,12 @@
     creatingFolder = true;
     try {
       await CreateFolder(appState.currentBucket, appState.currentPrefix, newFolderName.trim());
-      appState.notify('Folder created', 'success');
+      appState.notify("Folder created", "success");
       appState.showNewFolder = false;
-      newFolderName = '';
+      newFolderName = "";
       appState.refreshTrigger = Date.now();
     } catch (e) {
-      appState.notify(`Create folder failed: ${e}`, 'error');
+      appState.notify(`Create folder failed: ${e}`, "error");
     } finally {
       creatingFolder = false;
     }
@@ -364,10 +360,9 @@
     try {
       const dir = await OpenDirectoryDialog();
       if (!dir) return;
-      // upload:folder:start event will set uploadBatch; batch panel handles completion
       await UploadFile(appState.currentBucket, appState.currentPrefix, dir);
     } catch (e) {
-      appState.notify(`Upload failed: ${e}`, 'error');
+      appState.notify(`Upload failed: ${e}`, "error");
       appState.uploadBatch = null;
     }
     closeCtx();
@@ -380,46 +375,45 @@
       if (!files?.length) return;
 
       if (files.length > 1) {
-        // Batch mode: panel handles progress + completion feedback
         appState.uploadBatch = { total: files.length, done: 0, errors: 0 };
       }
 
       await UploadFiles(appState.currentBucket, appState.currentPrefix, files);
 
       if (files.length === 1) {
-        appState.notify(`Uploaded "${files[0].split('/').pop()}"`, 'success');
+        appState.notify(`Uploaded "${files[0].split("/").pop()}"`, "success");
       }
       appState.refreshTrigger = Date.now();
     } catch (e) {
       appState.uploadBatch = null;
-      appState.notify(`Upload failed: ${e}`, 'error');
+      appState.notify(`Upload failed: ${e}`, "error");
     }
     closeCtx();
   }
 
-  // ─── Keyboard shortcuts ──────────────────────────────────────────────────────
+  // Keyboard shortcuts
 
   function handleKey(e: KeyboardEvent) {
     const tag = (e.target as HTMLElement).tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
 
-    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+    if ((e.ctrlKey || e.metaKey) && e.key === "a") {
       e.preventDefault();
       selectAll();
     }
-    if (e.key === 'Escape') {
+    if (e.key === "Escape") {
       appState.selectedKeys = new Set();
       closeCtx();
     }
-    if ((e.key === 'Delete' || e.key === 'Backspace') && appState.selectedKeys.size > 0) {
+    if ((e.key === "Delete" || e.key === "Backspace") && appState.selectedKeys.size > 0) {
       doDelete();
     }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'c') doCopy();
-    if ((e.ctrlKey || e.metaKey) && e.key === 'x') doCut();
-    if ((e.ctrlKey || e.metaKey) && e.key === 'v') void doPaste();
+    if ((e.ctrlKey || e.metaKey) && e.key === "c") doCopy();
+    if ((e.ctrlKey || e.metaKey) && e.key === "x") doCut();
+    if ((e.ctrlKey || e.metaKey) && e.key === "v") void doPaste();
   }
 
-  // ─── Checkbox toggle ─────────────────────────────────────────────────────────
+  // Checkbox toggles
 
   function toggleCheck(e: Event, obj: S3Object) {
     e.stopPropagation();
@@ -436,7 +430,7 @@
     }
   }
 
-  // ─── Derived helpers ─────────────────────────────────────────────────────────
+  // Derived helpers
 
   const filteredObjects = $derived.by(() => {
     const q = appState.searchQuery.toLowerCase().trim();
@@ -447,313 +441,98 @@
 
   const virtualRows = $derived($rowVirtualizer.getVirtualItems());
 
-  const allChecked = $derived(filteredObjects.length > 0 && appState.selectedKeys.size === filteredObjects.length);
-  const someChecked = $derived(appState.selectedKeys.size > 0 && appState.selectedKeys.size < filteredObjects.length);
+  const allChecked = $derived(
+    filteredObjects.length > 0 && appState.selectedKeys.size === filteredObjects.length,
+  );
+  const someChecked = $derived(
+    appState.selectedKeys.size > 0 && appState.selectedKeys.size < filteredObjects.length,
+  );
   const multiSelected = $derived(appState.selectedKeys.size > 1);
-  const hasSelectedFiles = $derived([...appState.selectedKeys].some((k) => !k.endsWith('/')));
+  const hasSelectedFiles = $derived([...appState.selectedKeys].some((k) => !k.endsWith("/")));
 </script>
 
 <svelte:window onkeydown={handleKey} onclick={closeCtx} />
 
 <div class="flex flex-col flex-1 overflow-hidden">
   {#if !appState.currentBucket}
-    <!-- Empty / no bucket selected -->
-    <div class="flex flex-col items-center justify-center flex-1 gap-3 text-base-content/15 select-none">
+    <div
+      class="flex flex-col items-center justify-center flex-1 gap-3 text-base-content/15 select-none"
+    >
       <HugeiconsIcon icon={Folder01Icon} size={72} />
       <p class="text-sm font-medium">Select a bucket from the sidebar</p>
     </div>
   {:else}
-    <!-- New folder bar -->
     {#if appState.showNewFolder}
-      <div class="flex items-center gap-2 px-4 py-2 bg-base-200 border-b border-base-300 shrink-0">
-        <HugeiconsIcon icon={FolderAddIcon} size={14} class="text-base-content/60" />
-        <input
-          class="input input-bordered input-xs bg-base-100 w-48 font-mono"
-          placeholder="folder-name"
-          bind:value={newFolderName}
-          use:focus
-          onkeydown={(e) => {
-            if (e.key === 'Enter') void doCreateFolder();
-            if (e.key === 'Escape') { appState.showNewFolder = false; newFolderName = ''; }
-          }}
-        />
-        <button class="btn btn-primary btn-xs px-3" onclick={doCreateFolder} disabled={creatingFolder || !newFolderName.trim()}>
-          {#if creatingFolder}<span class="loading loading-spinner loading-xs"></span>{:else}Create{/if}
-        </button>
-        <button class="btn btn-ghost btn-xs" onclick={() => { appState.showNewFolder = false; newFolderName = ''; }}>Cancel</button>
-      </div>
+      <NewFolderBar
+        bind:newFolderName
+        {creatingFolder}
+        oncreate={doCreateFolder}
+        oncancel={() => {
+          appState.showNewFolder = false;
+          newFolderName = "";
+        }}
+      />
     {/if}
 
+    <ClipboardBar
+      onpaste={doPaste}
+      onclear={() => {
+        appState.clipboard = null;
+      }}
+    />
 
+    <FileActionBar
+      {hasSelectedFiles}
+      {searchBusy}
+      oncopy={doCopy}
+      oncut={doCut}
+      ondownload={() => doDownload()}
+      onpaste={doPaste}
+      ondelete={doDelete}
+    />
 
-    <!-- Clipboard hint bar -->
-    {#if appState.clipboard && appState.selectedKeys.size === 0}
-      <div class="flex items-center gap-2 px-4 py-1.5 bg-info/8 border-b border-info/15 text-xs shrink-0">
-        <HugeiconsIcon icon={FilePasteIcon} size={13} class="text-info" />
-        <span class="text-info/70">{appState.clipboard.keys.length} item(s) ready to {appState.clipboard.operation}</span>
-        <button class="btn btn-info btn-xs h-5 min-h-0 px-2 ml-2 text-xs" onclick={doPaste}>Paste here</button>
-        <button class="btn btn-ghost btn-xs h-5 min-h-0 px-2 text-xs" onclick={() => { appState.clipboard = null; }}>Clear</button>
-      </div>
-    {/if}
+    <FileTable
+      {filteredObjects}
+      totalSize={$rowVirtualizer.getTotalSize()}
+      {virtualRows}
+      {allChecked}
+      {someChecked}
+      {multiSelected}
+      {searchBusy}
+      bind:listContainerEl
+      onrowclick={handleRowClick}
+      ondblclick={handleDblClick}
+      oncontextmenu={openCtx}
+      ontoggleall={toggleAll}
+      ontogglecheck={toggleCheck}
+      onopenItemMenu={openItemMenu}
+      onupload={doUpload}
+    />
 
-    <!-- Bulk operations bar / filter bar -->
-    <div class="flex items-center gap-2 px-4 py-1.5 border-b text-xs shrink-0 select-none {appState.selectedKeys.size > 0 ? 'bg-primary/8 border-primary/15' : 'border-transparent'}">
-      {#if appState.selectedKeys.size > 0}
-        <span class="text-primary font-semibold">{appState.selectedKeys.size} selected</span>
-        <div class="flex items-center gap-1 ml-2">
-          <button class="btn btn-ghost btn-xs h-5 min-h-0 px-2 gap-1 text-xs" onclick={doCopy} title="Copy">
-            <HugeiconsIcon icon={Copy01Icon} size={12} />
-            Copy
-          </button>
-          <button class="btn btn-ghost btn-xs h-5 min-h-0 px-2 gap-1 text-xs" onclick={doCut} title="Cut">
-            <HugeiconsIcon icon={Scissor01Icon} size={12} />
-            Cut
-          </button>
-          {#if hasSelectedFiles}
-            <button class="btn btn-ghost btn-xs h-5 min-h-0 px-2 gap-1 text-xs" onclick={() => doDownload()} title="Download">
-              <HugeiconsIcon icon={Download01Icon} size={12} />
-              Download
-            </button>
-          {/if}
-          {#if appState.clipboard}
-            <button class="btn btn-ghost btn-xs h-5 min-h-0 px-2 gap-1 text-xs" onclick={doPaste} title="Paste">
-              <HugeiconsIcon icon={FilePasteIcon} size={12} />
-              Paste
-            </button>
-          {/if}
-          <span class="w-px h-3.5 bg-base-300 mx-1"></span>
-          <button class="btn btn-ghost btn-xs h-5 min-h-0 px-2 gap-1 text-xs text-error hover:bg-error/10" onclick={doDelete} title="Delete selected">
-            <HugeiconsIcon icon={Delete02Icon} size={12} />
-            Delete
-          </button>
-        </div>
-        <button class="ml-auto text-base-content/30 hover:text-base-content/60 text-xs" onclick={() => { appState.selectedKeys = new Set(); }}>
-          Clear
-        </button>
-      {:else}
-        <label class="input input-xs input-ghost bg-base-300/50 h-6 min-h-0 w-64 focus-within:w-80 transition-all gap-1.5 ml-auto">
-          <HugeiconsIcon icon={Search01Icon} size={12} />
-          <input
-            type="text"
-            class="grow text-xs"
-            placeholder="Filter..."
-            bind:value={appState.searchQuery}
-          />
-          {#if searchBusy}
-            <span class="loading loading-spinner loading-xs text-base-content/40"></span>
-          {/if}
-          {#if appState.searchQuery}
-            <button class="text-base-content/40 hover:text-base-content/70 text-xs" onclick={() => { appState.searchQuery = ''; }}>✕</button>
-          {/if}
-        </label>
-      {/if}
-    </div>
-
-    <!-- File table -->
-    <div
-      class="flex-1 overflow-y-auto"
-      bind:this={listContainerEl}
-      role="region"
-      oncontextmenu={(e) => openCtx(e, null)}
-    >
-      {#if filteredObjects.length === 0 && !appState.isLoading && !searchBusy}
-        <div
-          class="flex flex-col items-center justify-center h-full gap-3 text-base-content/15 select-none"
-          role="region"
-          aria-label="Empty folder"
-        >
-          <HugeiconsIcon icon={Folder01Icon} size={56} />
-          <p class="text-sm">This folder is empty</p>
-          <button
-            class="btn btn-ghost btn-xs gap-1.5 text-base-content/30 mt-1"
-            onclick={doUpload}
-          >
-            <HugeiconsIcon icon={Upload01Icon} size={13} />
-            Upload files
-          </button>
-        </div>
-      {:else}
-        <div style="height: {$rowVirtualizer.getTotalSize()}px; position: relative;">
-          <table class="table table-sm w-full">
-            <thead class="sticky top-0 z-10 bg-base-200">
-              <tr>
-                <th class="py-2 px-2 w-8">
-                  <input
-                    type="checkbox"
-                    class="checkbox checkbox-xs checkbox-primary"
-                    checked={allChecked}
-                    indeterminate={someChecked}
-                    onchange={toggleAll}
-                  />
-                </th>
-                <th class="py-2 px-2 text-xs font-semibold uppercase tracking-wider text-base-content/35 text-left w-full">Name</th>
-                {#if appState.settings.showFileDetails}
-                  <th class="py-2 px-4 text-xs font-semibold uppercase tracking-wider text-base-content/35 whitespace-nowrap text-right">Size</th>
-                  <th class="py-2 px-4 text-xs font-semibold uppercase tracking-wider text-base-content/35 whitespace-nowrap">Type</th>
-                  <th class="py-2 px-4 text-xs font-semibold uppercase tracking-wider text-base-content/35 whitespace-nowrap">Modified</th>
-                {/if}
-                <th class="py-2 px-2 w-8"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each virtualRows as row, idx (row.index)}
-                {@const obj = filteredObjects[row.index]}
-                {#if obj}
-                  {@const icon = getFileIcon(obj.name, obj.isFolder)}
-                  {@const sel = appState.selectedKeys.has(obj.key)}
-                  {@const clipped = !!appState.clipboard?.keys.includes(obj.key)}
-                  <tr
-                    style="height: {row.size}px; transform: translateY({row.start - idx * row.size}px);"
-                    class="cursor-pointer transition-colors group"
-                    class:bg-primary={sel}
-                    class:text-primary-content={sel}
-                    class:opacity-50={clipped && !sel}
-                    onclick={(e) => handleRowClick(e, obj)}
-                    ondblclick={() => handleDblClick(obj)}
-                    oncontextmenu={(e) => openCtx(e, obj)}
-                  >
-                    <td class="py-1.5 px-2 w-8" onclick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        class={`checkbox checkbox-xs ${sel ? 'border-white' : 'checkbox-primary'}`}
-                        checked={sel}
-                        onchange={(e) => toggleCheck(e, obj)}
-                      />
-                    </td>
-                    <td class="py-1.5 px-2">
-                      <div class="flex items-center gap-2.5">
-                        <span class={sel ? 'text-primary-content/80' : obj.isFolder ? 'text-warning/85' : 'text-base-content/60 group-hover:text-base-content/90'}>
-                          <HugeiconsIcon icon={icon} size={15} />
-                        </span>
-                        <span class="text-sm font-mono truncate" class:italic={clipped && !sel}>{obj.name}</span>
-                        {#if clipped}
-                          <span class="text-xs opacity-40 ml-1">({appState.clipboard?.operation})</span>
-                        {/if}
-                      </div>
-                    </td>
-                    {#if appState.settings.showFileDetails}
-                      <td class="py-1.5 px-4 text-xs font-mono text-right whitespace-nowrap">
-                        <span class:opacity-50={!sel}>{obj.isFolder ? '—' : formatFileSize(obj.size)}</span>
-                      </td>
-                      <td class="py-1.5 px-4 text-xs font-mono whitespace-nowrap">
-                        <span class:opacity-50={!sel}>{getFileType(obj.name, obj.isFolder)}</span>
-                      </td>
-                      <td class="py-1.5 px-4 text-xs font-mono whitespace-nowrap">
-                        <span class:opacity-50={!sel}>{obj.isFolder ? '—' : formatDate(obj.lastModified)}</span>
-                      </td>
-                    {/if}
-                    <td class="py-1.5 px-2 w-8">
-                      <button
-                        class="btn btn-ghost btn-xs btn-square p-0 h-6 w-6 min-h-0 opacity-0 group-hover:opacity-80 hover:opacity-100! transition-opacity"
-                        class:opacity-80={sel}
-                        class:invisible={multiSelected}
-                        onclick={(e) => openItemMenu(e, obj)}
-                        title="Actions"
-                      >
-                        <HugeiconsIcon icon={MoreVerticalIcon} size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                {/if}
-              {/each}
-            </tbody>
-          </table>
-        </div>
-      {/if}
-    </div>
-
-    <!-- Status bar — outside the scroll container so it always sits at the bottom -->
-    <div class="py-2 flex justify-center border-t border-base-300 shrink-0 min-h-8">
-      {#if appState.isLoading}
-        <span class="loading loading-spinner loading-xs text-primary/40"></span>
-      {:else if searchBusy}
-        <span class="loading loading-spinner loading-xs text-base-content/40"></span>
-      {:else if appState.searchQuery.trim() && searchResults !== null}
-        <span class="text-xs text-base-content/30">{filteredObjects.length} match(es)</span>
-      {:else if appState.hasMore}
-        <button class="btn btn-ghost btn-xs text-base-content/30" onclick={() => loadObjects(false)}>
-          Load more
-        </button>
-      {:else if filteredObjects.length > 0}
-        <span class="text-xs text-base-content/15">{filteredObjects.length} items</span>
-      {/if}
-    </div>
+    <FileStatusBar
+      {filteredObjects}
+      {searchBusy}
+      {searchResults}
+      onloadmore={() => loadObjects(false)}
+    />
   {/if}
 </div>
 
-<!-- Context menu -->
 {#if ctxMenu}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="fixed z-50 bg-base-200 border border-base-300 rounded-box shadow-2xl min-w-48 py-1"
-    style="left:{Math.min(ctxMenu.x, window.innerWidth - 200)}px; top:{Math.min(ctxMenu.y, window.innerHeight - 300)}px;"
-    onclick={(e) => e.stopPropagation()}
-    oncontextmenu={(e) => e.preventDefault()}
-    onkeydown={(e) => { if (e.key === 'Escape') ctxMenu = null; }}
-    role="menu"
-    tabindex="-1"
-  >
-    {#if ctxMenu.target}
-      {@const t = ctxMenu.target}
-
-      {#if !t.isFolder}
-        <button
-          class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left transition-colors"
-          onclick={() => doDownload(t)}
-        >
-          <HugeiconsIcon icon={Download01Icon} size={14} class="text-base-content/60" />
-          Download
-        </button>
-        <button
-          class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left transition-colors"
-          onclick={() => doPresignedUrl(t)}
-        >
-          <HugeiconsIcon icon={Link03Icon} size={14} class="text-base-content/60" />
-          Copy presigned URL
-        </button>
-        <div class="h-px bg-base-300 my-1"></div>
-      {/if}
-
-      <button class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left" onclick={doCopy}>
-        <HugeiconsIcon icon={Copy01Icon} size={14} class="text-base-content/60" />
-        Copy
-      </button>
-      <button class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left" onclick={doCut}>
-        <HugeiconsIcon icon={Scissor01Icon} size={14} class="text-base-content/60" />
-        Cut
-      </button>
-      {#if appState.clipboard}
-        <button class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left" onclick={doPaste}>
-          <HugeiconsIcon icon={FilePasteIcon} size={14} class="text-base-content/60" />
-          Paste ({appState.clipboard.keys.length})
-        </button>
-      {/if}
-      <div class="h-px bg-base-300 my-1"></div>
-      <button class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-error/10 text-error text-left" onclick={doDelete}>
-        <HugeiconsIcon icon={Delete02Icon} size={14} />
-        Delete
-      </button>
-    {:else}
-      <!-- Background right-click -->
-      <button class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left" onclick={() => { appState.showNewFolder = true; closeCtx(); }}>
-        <HugeiconsIcon icon={FolderAddIcon} size={14} class="text-base-content/60" />
-        New folder
-      </button>
-      <button class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left" onclick={doUpload}>
-        <HugeiconsIcon icon={Upload01Icon} size={14} class="text-base-content/60" />
-        Upload files
-      </button>
-      <button class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left" onclick={doUploadFolder}>
-        <HugeiconsIcon icon={FolderAddIcon} size={14} class="text-base-content/60" />
-        Upload folder
-      </button>
-      {#if appState.clipboard}
-        <div class="h-px bg-base-300 my-1"></div>
-        <button class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left" onclick={doPaste}>
-          <HugeiconsIcon icon={FilePasteIcon} size={14} class="text-base-content/60" />
-          Paste ({appState.clipboard.keys.length})
-        </button>
-      {/if}
-    {/if}
-  </div>
+  <FileContextMenu
+    {ctxMenu}
+    onclose={closeCtx}
+    ondownload={(obj) => doDownload(obj)}
+    onpresignedurl={(obj) => doPresignedUrl(obj)}
+    oncopy={doCopy}
+    oncut={doCut}
+    onpaste={doPaste}
+    ondelete={doDelete}
+    onnewfolder={() => {
+      appState.showNewFolder = true;
+      closeCtx();
+    }}
+    onupload={doUpload}
+    onuploadfolder={doUploadFolder}
+  />
 {/if}
