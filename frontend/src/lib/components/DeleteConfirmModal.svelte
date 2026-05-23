@@ -1,7 +1,7 @@
 <script lang="ts">
   import HugeiconsIcon from '$lib/components/Icon.svelte';
   import { Delete02Icon, Alert02Icon } from '@hugeicons/core-free-icons';
-  import { DeleteObjects, DeleteFolder } from '$lib/wailsjs/go/main/App';
+  import { DeleteObjects, DeleteFolder } from '$bindings/oso/app';
   import { appState } from '$lib/stores/appState.svelte';
 
   let deleting = $state(false);

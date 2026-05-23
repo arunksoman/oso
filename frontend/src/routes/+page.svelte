@@ -2,8 +2,8 @@
   import { onMount } from 'svelte';
   import HugeiconsIcon from '$lib/components/Icon.svelte';
   import { Copy01Icon, Cancel01Icon, Tick01Icon, Alert02Icon, InformationCircleIcon } from '@hugeicons/core-free-icons';
-  import { IsConnected, GetSettings } from '$lib/wailsjs/go/main/App';
-  import { EventsOn } from '$lib/wailsjs/runtime/runtime';
+  import { IsConnected, GetSettings } from '$bindings/oso/app';
+  import { Events } from '@wailsio/runtime';
   import { appState } from '$lib/stores/appState.svelte';
   import SetupScreen from '$lib/components/SetupScreen.svelte';
   import Sidebar from '$lib/components/Sidebar.svelte';
@@ -32,11 +32,13 @@
     }
 
     // Upload event listeners
-    EventsOn('upload:folder:start', (data: { total: number }) => {
+    Events.On('upload:folder:start', (e) => {
+      const data = e.data as { total: number };
       appState.uploadBatch = { total: data.total, done: 0, errors: 0 };
     });
 
-    EventsOn('upload:progress', (data: { key: string; progress: number }) => {
+    Events.On('upload:progress', (e) => {
+      const data = e.data as { key: string; progress: number };
       // In batch mode the batch bar handles progress — skip individual entries
       if (appState.uploadBatch) return;
       appState.uploads = {
@@ -45,7 +47,8 @@
       };
     });
 
-    EventsOn('upload:done', (data: { key: string }) => {
+    Events.On('upload:done', (e) => {
+      const data = e.data as { key: string };
       if (appState.uploadBatch) {
         const next = { ...appState.uploadBatch, done: appState.uploadBatch.done + 1 };
         appState.uploadBatch = next;
@@ -70,7 +73,8 @@
       }, 4000);
     });
 
-    EventsOn('upload:error', (data: { key: string; error: string }) => {
+    Events.On('upload:error', (e) => {
+      const data = e.data as { key: string; error: string };
       if (appState.uploadBatch) {
         const next = { ...appState.uploadBatch, errors: appState.uploadBatch.errors + 1 };
         appState.uploadBatch = next;

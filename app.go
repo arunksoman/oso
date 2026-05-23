@@ -13,6 +13,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // version is set at build time via -ldflags "-X main.version=x.y.z"
@@ -23,7 +24,7 @@ var wailsJSON []byte
 
 // App struct
 type App struct {
-	ctx           context.Context
+	app           *application.App
 	s3Client      *s3.Client
 	presignClient *s3.PresignClient
 	appConfig     *S3Config
@@ -69,8 +70,8 @@ type ListObjectsResult struct {
 }
 
 // NewApp creates a new App application struct
-func NewApp() *App {
-	return &App{}
+func NewApp(app *application.App) *App {
+	return &App{app: app}
 }
 
 // GetVersion returns the app version
@@ -89,9 +90,10 @@ func (a *App) GetVersion() string {
 	return version
 }
 
-func (a *App) startup(ctx context.Context) {
-	a.ctx = ctx
+// ServiceStartup is called by Wails v3 when the service is initialised
+func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
 	a.loadConfig()
+	return nil
 }
 
 func (a *App) configDir() string {

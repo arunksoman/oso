@@ -1,7 +1,7 @@
 <script lang="ts">
   import HugeiconsIcon from '$lib/components/Icon.svelte';
   import { BucketIcon, WifiError02Icon } from '@hugeicons/core-free-icons';
-  import { Connect } from '$lib/wailsjs/go/main/App';
+  import { Connect } from '$bindings/oso/app';
   import { appState } from '$lib/stores/appState.svelte';
   import TitleBar from './TitleBar.svelte';
 

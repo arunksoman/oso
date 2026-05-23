@@ -1,7 +1,7 @@
 <script lang="ts">
   import HugeiconsIcon from '$lib/components/Icon.svelte';
   import { Link03Icon, Tick01Icon, Refresh01Icon } from '@hugeicons/core-free-icons';
-  import { GetPresignedURL } from '$lib/wailsjs/go/main/App';
+  import { GetPresignedURL } from '$bindings/oso/app';
   import { appState } from '$lib/stores/appState.svelte';
 
   const expiryOptions = [

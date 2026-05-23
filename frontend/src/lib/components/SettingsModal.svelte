@@ -7,7 +7,7 @@
     Connect,
     Disconnect,
     OpenDirectoryDialog,
-  } from '$lib/wailsjs/go/main/App';
+  } from '$bindings/oso/app';
   import { appState } from '$lib/stores/appState.svelte';
   import type { AppSettings, S3Config } from '$lib/stores/appState.svelte';
 

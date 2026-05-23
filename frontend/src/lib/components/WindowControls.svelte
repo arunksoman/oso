@@ -9,17 +9,15 @@
     Sun02Icon,
   } from '@hugeicons/core-free-icons';
   import {
-    WindowMinimise,
-    WindowToggleMaximise,
-    WindowIsMaximised,
-    Quit,
-  } from '$lib/wailsjs/runtime/runtime';
+    Window,
+    Application,
+  } from '@wailsio/runtime';
   import { appState } from '$lib/stores/appState.svelte';
 
   let maximized = $state(false);
 
   async function checkMaximized() {
-    maximized = await WindowIsMaximised();
+    maximized = await Window.IsMaximised();
   }
 
   // Check on mount & after toggle
@@ -28,7 +26,11 @@
   });
 
   async function toggleMaximize() {
-    await WindowToggleMaximise();
+    if (maximized) {
+      await Window.Restore();
+    } else {
+      await Window.Maximise();
+    }
     await checkMaximized();
   }
 
@@ -63,7 +65,7 @@
   <!-- Minimize -->
   <button
     class="btn btn-ghost btn-xs p-1 h-auto min-h-0 text-base-content/50 hover:text-base-content"
-    onclick={WindowMinimise}
+    onclick={() => Window.Minimise()}
     title="Minimize"
   >
     <HugeiconsIcon icon={ArrowShrink02Icon} size={14} />
@@ -85,7 +87,7 @@
   <!-- Close -->
   <button
     class="btn btn-ghost btn-xs p-1 h-auto min-h-0 text-base-content/50 hover:text-error"
-    onclick={Quit}
+    onclick={() => Application.Quit()}
     title="Close"
   >
     <HugeiconsIcon icon={Cancel01Icon} size={14} />

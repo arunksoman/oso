@@ -1,0 +1,42 @@
+# Wails v3 project configuration
+version: '3'
+
+info:
+  companyName: "StackQuest"
+  productName: "Oso"
+  productIdentifier: "com.stackquest.oso"
+  description: "Object Storage Operator"
+  copyright: "Copyright © 2026 StackQuest"
+  comments: "Oso — Object Storage Operator. Built using Wails (https://wails.io)"
+  version: "0.6.2"
+
+# Dev mode configuration (used by `wails3 dev`)
+dev_mode:
+  root_path: .
+  log_level: warn
+  debounce: 1000
+  ignore:
+    dir:
+      - .git
+      - node_modules
+      - frontend
+      - bin
+    file:
+      - .DS_Store
+      - .gitignore
+      - .gitkeep
+      - "*_test.go"
+    watched_extension:
+      - "*.go"
+    git_ignore: true
+  executes:
+    - cmd: wails3 task common:install:frontend:deps
+      type: once
+    - cmd: wails3 task common:dev:frontend
+      type: background
+    - cmd: go build -buildvcs=false -gcflags=all="-l" -o bin/oso.exe .
+      type: blocking
+    - cmd: bin/oso.exe
+      type: primary
+
+fileAssociations: []

@@ -9,7 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // progressReader wraps an io.ReadSeeker to emit upload progress events
@@ -17,7 +17,7 @@ type progressReader struct {
 	r     io.ReadSeeker
 	total int64
 	read  int64
-	ctx   context.Context
+	app   *application.App
 	key   string
 }
 
@@ -26,7 +26,7 @@ func (pr *progressReader) Read(p []byte) (n int, err error) {
 	pr.read += int64(n)
 	if pr.total > 0 {
 		progress := float64(pr.read) / float64(pr.total) * 100
-		runtime.EventsEmit(pr.ctx, "upload:progress", map[string]interface{}{
+		pr.app.Event.Emit("upload:progress", map[string]interface{}{
 			"key":      pr.key,
 			"progress": progress,
 		})
@@ -53,7 +53,7 @@ func (a *App) uploadFileWithKey(bucket, key, localPath string, size int64) error
 	pr := &progressReader{
 		r:     f,
 		total: size,
-		ctx:   a.ctx,
+		app:   a.app,
 		key:   key,
 	}
 
@@ -64,12 +64,12 @@ func (a *App) uploadFileWithKey(bucket, key, localPath string, size int64) error
 		ContentLength: aws.Int64(size),
 	})
 	if err != nil {
-		runtime.EventsEmit(a.ctx, "upload:error", map[string]interface{}{
+		a.app.Event.Emit("upload:error", map[string]interface{}{
 			"key": key, "error": err.Error(),
 		})
 		return err
 	}
-	runtime.EventsEmit(a.ctx, "upload:done", map[string]interface{}{"key": key})
+	a.app.Event.Emit("upload:done", map[string]interface{}{"key": key})
 	return nil
 }
 
@@ -86,7 +86,7 @@ func (a *App) uploadFolderContents(bucket, s3Prefix, localFolderPath string) err
 		}
 		return nil
 	})
-	runtime.EventsEmit(a.ctx, "upload:folder:start", map[string]interface{}{"total": total})
+	a.app.Event.Emit("upload:folder:start", map[string]interface{}{"total": total})
 
 	return filepath.Walk(localFolderPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
