@@ -19,42 +19,49 @@ A cross-platform desktop application for browsing and managing S3-compatible obj
 
 | Layer     | Technology                              |
 |-----------|-----------------------------------------|
-| Desktop   | [Wails v2](https://wails.io)            |
+| Desktop   | [Wails v3](https://v3.wails.io)         |
 | Backend   | Go + aws-sdk-go-v2                      |
 | Frontend  | SvelteKit + Svelte 5 Runes              |
 | UI        | DaisyUI 5 + Tailwind CSS 4              |
 | Icons     | HugeIcons                               |
 | i18n      | Paraglide JS                            |
+| Build     | [Task](https://taskfile.dev) (via `wails3 task`) |
 
 ## Prerequisites
 
-- [Go 1.24+](https://go.dev/dl/)
+- [Go 1.25+](https://go.dev/dl/)
 - [Node.js 20+](https://nodejs.org/) with [pnpm](https://pnpm.io/)
-- [Wails CLI v2](https://wails.io/docs/gettingstarted/installation)
+- [Wails CLI v3](https://v3.wails.io/getting-started/installation/)
+- Linux only: `libgtk-4-dev` and `libwebkitgtk-6.0-dev`
 
 ```bash
-go install github.com/wailsapp/wails/v2/cmd/wails@latest
+go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.26
+wails3 doctor
 ```
+
+The build pipeline is defined in [Taskfile.yml](Taskfile.yml) and the platform Taskfiles under [build/](build/). `wails3 task` runs them with the Task runner bundled in the Wails CLI, so a separate `task` install is optional.
 
 ## Development
 
 ```bash
-# Install frontend dependencies
-cd frontend && pnpm install && cd ..
-
-# Start live-reload dev server
-wails dev
+wails3 dev
 ```
 
-The app opens as a native window. A browser dev server also runs at `http://localhost:34115` for debugging Go methods from devtools.
+This installs frontend dependencies, generates TypeScript bindings into `frontend/bindings/`, starts the Vite dev server on port 9245 and opens the app with live reload.
 
 ## Build
 
 ```bash
-wails build
+# Production binary for the current OS, written to bin/
+wails3 build
+
+# Platform packages
+wails3 task windows:package          # NSIS installer (bin/oso-amd64-installer.exe)
+wails3 task darwin:package:universal # Universal .app bundle
+wails3 task linux:create:deb         # .deb (also linux:create:rpm, linux:create:appimage)
 ```
 
-The output binary is placed in `build/bin/`.
+Set `VERSION=x.y.z` in the environment to stamp the version into the binary. App metadata (name, company, version) lives in [build/config.yml](build/config.yml); after changing it run `wails3 task common:update:build-assets` to regenerate Info.plist, NSIS and nfpm files.
 
 ## Local Testing with MinIO
 
@@ -86,18 +93,22 @@ A bucket named `oso-test` is created automatically on first startup.
 
 ```
 oso/
-├── app.go                  # All Go/S3 backend logic
+├── app.go                  # App service: config, connection, version
+├── s3_*.go                 # S3 operations (buckets, objects, upload, download)
+├── dialogs.go              # Native file dialogs
 ├── main.go                 # Wails app entry point
+├── Taskfile.yml            # Build pipeline entry point
+├── build/                  # Build config, icons and platform Taskfiles
 ├── docker-compose.yaml     # Local MinIO for development
 ├── docker/
 │   └── minio/              # MinIO init script
 └── frontend/
+    ├── bindings/           # Auto-generated Go bindings (wails3 generate bindings)
     └── src/
         ├── lib/
         │   ├── components/ # Svelte UI components
         │   ├── stores/     # Svelte 5 runes state
-        │   ├── utils/      # File icons, formatting
-        │   └── wailsjs/    # Auto-generated Go bindings
+        │   └── utils/      # File icons, formatting
         └── routes/         # SvelteKit pages
 ```
 

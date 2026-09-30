@@ -1,29 +1,32 @@
-﻿package main
+package main
 
 import (
 	_ "embed"
 
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // version is set at build time via -ldflags "-X main.version=x.y.z"
 var version = "dev"
 
-//go:embed wails.json
-var wailsJSON []byte
+//go:embed build/config.yml
+var buildConfig []byte
 
-// App struct
+// App is the Wails service exposing all S3 operations to the frontend
 type App struct {
-	ctx           context.Context
 	s3Client      *s3.Client
 	presignClient *s3.PresignClient
 	appConfig     *S3Config
@@ -78,20 +81,38 @@ func (a *App) GetVersion() string {
 	if version != "dev" {
 		return version
 	}
-	var w struct {
-		Info struct {
-			ProductVersion string `json:"productVersion"`
-		} `json:"info"`
-	}
-	if json.Unmarshal(wailsJSON, &w) == nil && w.Info.ProductVersion != "" {
-		return w.Info.ProductVersion
+	if v := configVersion(); v != "" {
+		return v
 	}
 	return version
 }
 
-func (a *App) startup(ctx context.Context) {
-	a.ctx = ctx
+// configVersion reads info.version from the embedded build/config.yml
+func configVersion() string {
+	inInfo := false
+	scanner := bufio.NewScanner(bytes.NewReader(buildConfig))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, " ") {
+			inInfo = strings.HasPrefix(line, "info:")
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if inInfo && strings.HasPrefix(trimmed, "version:") {
+			v := strings.TrimSpace(strings.TrimPrefix(trimmed, "version:"))
+			if i := strings.Index(v, "#"); i >= 0 {
+				v = strings.TrimSpace(v[:i])
+			}
+			return strings.Trim(v, `"'`)
+		}
+	}
+	return ""
+}
+
+// ServiceStartup is called by Wails when the application starts
+func (a *App) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
 	a.loadConfig()
+	return nil
 }
 
 func (a *App) configDir() string {

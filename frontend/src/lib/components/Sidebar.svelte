@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import HugeiconsIcon from '$lib/components/Icon.svelte';
   import { BucketIcon, Refresh01Icon, Add01Icon } from '@hugeicons/core-free-icons';
-  import { ListBuckets, GetVersion, CreateBucket } from '$lib/wailsjs/go/main/App';
+  import { ListBuckets, GetVersion, CreateBucket } from '$bindings/oso/app';
   import { appState } from '$lib/stores/appState.svelte';
   import type { Bucket } from '$lib/stores/appState.svelte';
 

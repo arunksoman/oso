@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=Oso
+Comment=Oso — Object Storage Operator
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/oso %u
+Terminal=false
+Type=Application
+Icon=oso
+Categories=Utility;
+StartupWMClass=oso
+
+ 

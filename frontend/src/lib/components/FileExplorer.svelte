@@ -17,7 +17,7 @@
     UploadFile,
     UploadFiles,
     SearchObjects,
-  } from "$lib/wailsjs/go/main/App";
+  } from "$bindings/oso/app";
   import { appState } from "$lib/stores/appState.svelte";
   import type { S3Object } from "$lib/stores/appState.svelte";
   import NewFolderBar from "./explorer/NewFolderBar.svelte";
@@ -59,10 +59,10 @@
         appState.settings.pageSize || 1000,
       );
       appState.objects = reset
-        ? (result.objects ?? [])
-        : [...appState.objects, ...(result.objects ?? [])];
-      appState.continuationToken = result.nextContinuationToken ?? "";
-      appState.hasMore = result.hasMore ?? false;
+        ? (result?.objects ?? [])
+        : [...appState.objects, ...(result?.objects ?? [])];
+      appState.continuationToken = result?.nextContinuationToken ?? "";
+      appState.hasMore = result?.hasMore ?? false;
     } catch (e) {
       appState.notify(`Load failed: ${e}`, "error");
     } finally {

@@ -7,7 +7,7 @@ You are building a **desktop application** called **Oso (Object Storage Operator
 ## Tech Stack
 
 - Frontend: **SvelteKit (Svelte 5 with Runes syntax ONLY) + DaisyUI**
-- Backend: **Go (Wails)**
+- Backend: **Go (Wails v3)**
 - Storage: **S3-compatible object storage (AWS S3, MinIO, etc.)**
 
 ---

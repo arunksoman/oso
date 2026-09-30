@@ -2,43 +2,49 @@ package main
 
 import (
 	"embed"
+	"log"
 
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/options/windows"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-//go:embed all:frontend/build
+//go:embed all:frontend/dist
 var assets embed.FS
 
-func main() {
-	// Create an instance of the app structure
-	app := NewApp()
+func init() {
+	// Registered events get strongly typed JS/TS APIs from the binding generator.
+	application.RegisterEvent[UploadFolderStartEvent](EventUploadFolderStart)
+	application.RegisterEvent[UploadProgressEvent](EventUploadProgress)
+	application.RegisterEvent[UploadDoneEvent](EventUploadDone)
+	application.RegisterEvent[UploadErrorEvent](EventUploadError)
+}
 
-	// Create application with options
-	err := wails.Run(&options.App{
-		Title:     "Oso — Object Storage Operator",
-		Width:     1020,
-		Height:    740,
-		MinWidth:  1020,
-		MinHeight: 740,
-		Frameless: true,
-		AssetServer: &assetserver.Options{
-			Assets: assets,
+func main() {
+	app := application.New(application.Options{
+		Name:        "Oso",
+		Description: "Oso — Object Storage Operator",
+		Services: []application.Service{
+			application.NewService(NewApp()),
 		},
-		BackgroundColour: &options.RGBA{R: 30, G: 33, B: 41, A: 1},
-		OnStartup:        app.startup,
-		Windows: &windows.Options{
-			WebviewIsTransparent: false,
-			WindowIsTranslucent:  false,
+		Assets: application.AssetOptions{
+			Handler: application.AssetFileServerFS(assets),
 		},
-		Bind: []interface{}{
-			app,
+		Mac: application.MacOptions{
+			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 	})
 
-	if err != nil {
-		println("Error:", err.Error())
+	app.Window.NewWithOptions(application.WebviewWindowOptions{
+		Title:            "Oso — Object Storage Operator",
+		Width:            1020,
+		Height:           740,
+		MinWidth:         1020,
+		MinHeight:        740,
+		Frameless:        true,
+		BackgroundColour: application.NewRGB(30, 33, 41),
+		URL:              "/",
+	})
+
+	if err := app.Run(); err != nil {
+		log.Fatal(err)
 	}
 }

@@ -5,7 +5,8 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build",
+		"build": "vite build --mode production",
+		"build:dev": "vite build --minify false --mode development",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -43,6 +44,7 @@
 		"@hugeicons/core-free-icons": "^4.1.1",
 		"@hugeicons/svelte": "^1.1.2",
 		"@tanstack/svelte-virtual": "^3.13.24",
+		"@wailsio/runtime": "3.0.0-beta.26",
 		"daisyui": "^5.5.19"
 	}
 }

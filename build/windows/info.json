@@ -1,15 +1,15 @@
 {
 	"fixed": {
-		"file_version": "{{.Info.ProductVersion}}"
+		"file_version": "0.6.2"
 	},
 	"info": {
 		"0000": {
-			"ProductVersion": "{{.Info.ProductVersion}}",
-			"CompanyName": "{{.Info.CompanyName}}",
-			"FileDescription": "{{.Info.ProductName}}",
-			"LegalCopyright": "{{.Info.Copyright}}",
-			"ProductName": "{{.Info.ProductName}}",
-			"Comments": "{{.Info.Comments}}"
+			"ProductVersion": "0.6.2",
+			"CompanyName": "StackQuest",
+			"FileDescription": "Oso — Object Storage Operator",
+			"LegalCopyright": "Copyright © 2026 StackQuest",
+			"ProductName": "Oso",
+			"Comments": "Oso — Object Storage Operator. Built using Wails (https://wails.io)"
 		}
 	}
 }

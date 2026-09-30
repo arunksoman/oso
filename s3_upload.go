@@ -9,15 +9,51 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
+
+// Upload event names emitted to the frontend
+const (
+	EventUploadFolderStart = "upload:folder:start"
+	EventUploadProgress    = "upload:progress"
+	EventUploadDone        = "upload:done"
+	EventUploadError       = "upload:error"
+)
+
+// UploadFolderStartEvent announces how many files a folder upload contains
+type UploadFolderStartEvent struct {
+	Total int `json:"total"`
+}
+
+// UploadProgressEvent reports per-file upload progress (0-100)
+type UploadProgressEvent struct {
+	Key      string  `json:"key"`
+	Progress float64 `json:"progress"`
+}
+
+// UploadDoneEvent reports a finished file upload
+type UploadDoneEvent struct {
+	Key string `json:"key"`
+}
+
+// UploadErrorEvent reports a failed file upload
+type UploadErrorEvent struct {
+	Key   string `json:"key"`
+	Error string `json:"error"`
+}
+
+// emit sends an event to the frontend
+func emit(name string, data any) {
+	if app := application.Get(); app != nil {
+		app.Event.Emit(name, data)
+	}
+}
 
 // progressReader wraps an io.ReadSeeker to emit upload progress events
 type progressReader struct {
 	r     io.ReadSeeker
 	total int64
 	read  int64
-	ctx   context.Context
 	key   string
 }
 
@@ -26,10 +62,7 @@ func (pr *progressReader) Read(p []byte) (n int, err error) {
 	pr.read += int64(n)
 	if pr.total > 0 {
 		progress := float64(pr.read) / float64(pr.total) * 100
-		runtime.EventsEmit(pr.ctx, "upload:progress", map[string]interface{}{
-			"key":      pr.key,
-			"progress": progress,
-		})
+		emit(EventUploadProgress, UploadProgressEvent{Key: pr.key, Progress: progress})
 	}
 	return
 }
@@ -53,7 +86,6 @@ func (a *App) uploadFileWithKey(bucket, key, localPath string, size int64) error
 	pr := &progressReader{
 		r:     f,
 		total: size,
-		ctx:   a.ctx,
 		key:   key,
 	}
 
@@ -64,12 +96,10 @@ func (a *App) uploadFileWithKey(bucket, key, localPath string, size int64) error
 		ContentLength: aws.Int64(size),
 	})
 	if err != nil {
-		runtime.EventsEmit(a.ctx, "upload:error", map[string]interface{}{
-			"key": key, "error": err.Error(),
-		})
+		emit(EventUploadError, UploadErrorEvent{Key: key, Error: err.Error()})
 		return err
 	}
-	runtime.EventsEmit(a.ctx, "upload:done", map[string]interface{}{"key": key})
+	emit(EventUploadDone, UploadDoneEvent{Key: key})
 	return nil
 }
 
@@ -86,7 +116,7 @@ func (a *App) uploadFolderContents(bucket, s3Prefix, localFolderPath string) err
 		}
 		return nil
 	})
-	runtime.EventsEmit(a.ctx, "upload:folder:start", map[string]interface{}{"total": total})
+	emit(EventUploadFolderStart, UploadFolderStartEvent{Total: total})
 
 	return filepath.Walk(localFolderPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {

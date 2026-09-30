@@ -8,7 +8,7 @@
     FolderAddIcon,
     Settings01Icon,
   } from '@hugeicons/core-free-icons';
-  import { OpenMultipleFilesDialog, UploadFiles, OpenDirectoryDialog, UploadFile } from '$lib/wailsjs/go/main/App';
+  import { OpenMultipleFilesDialog, UploadFiles, OpenDirectoryDialog, UploadFile } from '$bindings/oso/app';
   import { appState } from '$lib/stores/appState.svelte';
   import Breadcrumb from './Breadcrumb.svelte';
 
