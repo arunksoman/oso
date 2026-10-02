@@ -4,6 +4,8 @@
 // The server build tag swaps the native GUI for the headless Wails
 // implementation, so the tests that need a running application work on every
 // OS and without a display. frontend/dist must exist (it is embedded).
+// cgo is switched off because on Linux Wails otherwise still links GTK and
+// WebKit, which a headless machine does not have.
 //
 //   node scripts/go-coverage.mjs          # minimum 95%
 //   GO_COVERAGE_MIN=90 node scripts/go-coverage.mjs
@@ -15,7 +17,7 @@ const profile = 'coverage.out';
 const test = spawnSync(
   'go',
   ['test', '-tags', 'server', '-count=1', `-coverprofile=${profile}`, './...'],
-  { stdio: 'inherit' }
+  { stdio: 'inherit', env: { ...process.env, CGO_ENABLED: '0' } }
 );
 if (test.status !== 0) process.exit(test.status ?? 1);
 

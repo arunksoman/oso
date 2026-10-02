@@ -14,6 +14,9 @@ env:
   NODE_OPTIONS: "--max-old-space-size=4096"
   # Minimum Go statement coverage; frontend thresholds live in frontend/vite.config.ts
   GO_COVERAGE_MIN: "95"
+  # Server-mode builds are pure Go. With cgo on, Wails links GTK and WebKit on
+  # Linux even under the server tag, and these jobs do not install them.
+  CGO_ENABLED: "0"
 
 permissions:
   contents: read

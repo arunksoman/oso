@@ -19,7 +19,7 @@ wails3 task common:update:build-assets # after editing build/config.yml (name, v
 
 go vet ./...
 go test ./...                    # fast Go tests; single test: go test -run TestName ./...
-go test -tags server ./...       # adds the tests that start a headless Wails app (needs frontend/dist)
+CGO_ENABLED=0 go test -tags server ./...   # adds the tests that start a headless Wails app (needs frontend/dist)
 wails3 task test                 # Go + frontend unit tests with the 95% coverage gates
 wails3 task test:e2e             # Playwright against the server-mode build; needs `docker compose up -d`
 
@@ -34,7 +34,7 @@ pnpm run format
 
 - **Versioning** (`build/config.yml`): `info.version` must be numeric `X.Y.Z`, because NSIS rejects pre-release suffixes. `info.displayVersion` is the version shown in the side panel and may carry a suffix (e.g. `0.7.0-beta.1`). After editing either, run `common:update:build-assets`. `VERSION=...` in the environment stamps `-X main.version` into production builds; without it, `GetVersion()` reads `displayVersion`, then `version`, from the embedded config.
 - **Tests** come in three layers, all gated in CI:
-  - **Go** (`*_test.go` next to the code). S3 calls run against the in-memory `fakeS3` server in `testutil_test.go` (`newConnectedApp`), and `isolateHome` keeps tests away from the real `~/.oso`. `wails_app_test.go` is built only with `-tags server`: that tag selects the headless Wails implementation, so those tests run a real `application.App` (updater against a fake GitHub API, dialogs, HTTP asset serving) on every OS without a display. `scripts/go-coverage.mjs` runs the suite with that tag and fails below 95% statement coverage.
+  - **Go** (`*_test.go` next to the code). S3 calls run against the in-memory `fakeS3` server in `testutil_test.go` (`newConnectedApp`), and `isolateHome` keeps tests away from the real `~/.oso`. `wails_app_test.go` is built only with `-tags server`: that tag selects the headless Wails implementation, so those tests run a real `application.App` (updater against a fake GitHub API, dialogs, HTTP asset serving) on every OS without a display. Build it with `CGO_ENABLED=0`: with cgo on, Linux still links GTK and WebKit under the server tag. `scripts/go-coverage.mjs` runs the suite that way and fails below 95% statement coverage.
   - **Frontend unit** (`src/**/*.test.ts`; Vitest, happy-dom, `@testing-library/svelte`). `src/test/setup.ts` auto-mocks every binding in `$bindings/oso/app` and replaces `@wailsio/runtime`, resets `appState` before each test and cancels leftover timers; tests set binding results with `vi.mocked(...)`. `FileExplorer.test.ts` swaps the virtualizer for a stand-in because happy-dom has no layout. Thresholds are in `vite.config.ts`: 95% statements, functions and lines, 90% branches.
   - **End-to-end** (`frontend/e2e`, Playwright). `playwright.config.ts` starts two copies of the server-mode build (`bin/oso-server`), one connected to MinIO through `S3_*` and one unconfigured for the setup screen, each with its own temporary home directory. `e2e/s3.ts` seeds and inspects MinIO directly. Native file dialogs and window controls do not exist in server mode, so uploads through the dialog are covered by the unit layers only.
 - `pnpm run check` reports missing `$lib/paraglide/*` modules until a Vite build or dev run has generated `src/lib/paraglide`.
