@@ -66,3 +66,34 @@ tasks:
     summary: Builds and runs the Docker image
     cmds:
       - task: common:run:docker
+
+  test:
+    summary: Runs the Go and frontend unit tests with their coverage gates
+    cmds:
+      - task: test:go
+      - task: test:frontend
+
+  test:go:
+    summary: Runs the Go tests against a headless Wails app; fails below 95% coverage
+    deps:
+      - task: common:build:frontend
+    cmds:
+      - node scripts/go-coverage.mjs
+
+  test:frontend:
+    summary: Runs the frontend unit tests; fails below the thresholds in vite.config.ts
+    dir: frontend
+    deps:
+      - task: common:install:frontend:deps
+    cmds:
+      - '{{.PACKAGE_MANAGER}} run test:coverage'
+
+  test:e2e:
+    summary: Runs the Playwright end-to-end tests (needs MinIO from docker compose up -d)
+    dir: frontend
+    deps:
+      - task: common:build:server
+        vars:
+          DEV: "true"
+    cmds:
+      - '{{.PACKAGE_MANAGER}} exec playwright test'

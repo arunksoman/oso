@@ -57,20 +57,19 @@ jobs:
       - name: Go vet
         run: go vet ./...
 
-      - name: Go test
-        run: go test ./...
-
       - name: Svelte check
         working-directory: frontend
         run: pnpm run check
 
-      - name: Frontend test
-        working-directory: frontend
-        run: pnpm run test
+  # Unit tests on Linux, Windows and macOS with the 95% coverage gates, plus
+  # the end-to-end tests. Nothing is built or released unless this passes.
+  test:
+    name: Test
+    uses: ./.github/workflows/test.yml
 
   build:
     name: Build (${{ matrix.name }})
-    needs: check
+    needs: [check, test]
     strategy:
       fail-fast: false
       matrix:

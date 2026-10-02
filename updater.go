@@ -16,6 +16,10 @@ const updateRepository = "arunksoman/oso"
 // updateChecksumAsset is the sha256sum listing release.yml attaches to each release
 const updateChecksumAsset = "SHA256SUMS"
 
+// updateAPIBaseURL overrides the GitHub API root; empty means api.github.com.
+// Tests point it at a local server.
+var updateAPIBaseURL = ""
+
 // updateAssetName returns the release asset that replaces the running app on
 // the given platform. The names must match the files release.yml publishes.
 func updateAssetName(platform, arch string) string {
@@ -44,6 +48,7 @@ func matchUpdateAsset(req updater.CheckRequest, assets []github.ReleaseAsset) in
 func initUpdater(app *application.App, currentVersion string) error {
 	provider, err := github.New(github.Config{
 		Repository: updateRepository,
+		BaseURL:    updateAPIBaseURL,
 		// Pre-release builds follow the pre-release channel; stable builds only see stable releases
 		Prerelease:    strings.Contains(currentVersion, "-"),
 		AssetMatcher:  matchUpdateAsset,

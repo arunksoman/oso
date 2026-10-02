@@ -30,6 +30,16 @@ export default defineConfig({
 	],
 	test: {
 		environment: 'happy-dom',
-		include: ['src/**/*.test.ts']
+		include: ['src/**/*.test.ts'],
+		setupFiles: ['src/test/setup.ts'],
+		coverage: {
+			provider: 'v8',
+			include: ['src/**/*.{ts,svelte}'],
+			exclude: ['src/**/*.test.ts', 'src/test/**', 'src/lib/paraglide/**', 'src/**/*.d.ts'],
+			reporter: ['text', 'html', 'json-summary'],
+			// CI fails below these. Branches sit lower because v8 also counts
+			// compiler-generated branches in Svelte templates.
+			thresholds: { statements: 95, functions: 95, lines: 95, branches: 90 }
+		}
 	}
 });

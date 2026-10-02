@@ -27,24 +27,37 @@ describe('getFileIcon', () => {
   });
 
   it.each([
-    ['photo.jpg', FileImageIcon],
-    ['logo.svg', Svg02Icon],
-    ['shot.nef', Raw02Icon],
-    ['clip.mp4', FileVideoIcon],
-    ['song.flac', FileMusicIcon],
-    ['paper.pdf', Pdf02Icon],
-    ['app.log', Txt02Icon],
-    ['data.csv', Csv02Icon],
-    ['letter.docx', Doc02Icon],
-    ['sheet.xlsx', Xls02Icon],
-    ['deck.pptx', Ppt02Icon],
-    ['main.go', FileCodeCornerIcon],
-    ['bundle.zip', FileZipIcon],
-    ['bundle.rar', Rar02Icon],
-    ['bundle.tar.gz', FileArchiveIcon],
-    ['setup.exe', FileDigitIcon],
-  ])('%s maps to its type icon', (name, icon) => {
-    expect(getFileIcon(name, false)).toBe(icon);
+    [FileImageIcon, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'ico', 'tiff', 'tif']],
+    [Svg02Icon, ['svg']],
+    [Raw02Icon, ['raw', 'cr2', 'nef', 'arw']],
+    [FileVideoIcon, ['mp4', 'avi', 'mov', 'mkv', 'wmv', 'flv', 'webm', 'm4v']],
+    [FileMusicIcon, ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac', 'wma']],
+    [Pdf02Icon, ['pdf']],
+    [Txt02Icon, ['txt', 'log', 'nfo']],
+    [Csv02Icon, ['csv']],
+    [Doc02Icon, ['doc', 'docx', 'odt']],
+    [Xls02Icon, ['xls', 'xlsx', 'ods']],
+    [Ppt02Icon, ['ppt', 'pptx', 'odp']],
+    [
+      FileCodeCornerIcon,
+      [
+        'json', 'js', 'ts', 'jsx', 'tsx', 'py', 'yaml', 'yml', 'md', 'html', 'htm', 'css', 'scss',
+        'go', 'rs', 'cpp', 'c', 'h', 'java', 'php', 'rb', 'swift', 'kt', 'sh', 'bash', 'xml',
+        'toml', 'ini', 'env', 'sql', 'graphql', 'proto', 'vue', 'svelte',
+      ],
+    ],
+    [FileZipIcon, ['zip']],
+    [Rar02Icon, ['rar']],
+    [FileArchiveIcon, ['7z', 'tar', 'gz', 'bz2', 'xz', 'zst']],
+    [FileDigitIcon, ['exe', 'msi', 'dmg', 'app', 'deb', 'rpm', 'bin', 'apk', 'ipa']],
+  ])('maps every extension of a type to its icon', (icon, extensions) => {
+    for (const ext of extensions) {
+      expect(getFileIcon(`file.${ext}`, false), ext).toBe(icon);
+    }
+  });
+
+  it('uses the last extension of a compound name', () => {
+    expect(getFileIcon('bundle.tar.gz', false)).toBe(FileArchiveIcon);
   });
 
   it('ignores extension case', () => {

@@ -22,6 +22,8 @@ type fakeS3 struct {
 	pageCap int
 	// deny makes every request fail with 403 AccessDenied
 	deny bool
+	// denyMethod fails only requests with this HTTP method
+	denyMethod string
 }
 
 type fakeListEntry struct {
@@ -70,7 +72,7 @@ func (f *fakeS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer f.mu.Unlock()
 
 	w.Header().Set("Content-Type", "application/xml")
-	if f.deny {
+	if f.deny || r.Method == f.denyMethod {
 		w.WriteHeader(http.StatusForbidden)
 		fmt.Fprint(w, `<Error><Code>AccessDenied</Code><Message>Access Denied</Message></Error>`)
 		return
