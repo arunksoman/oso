@@ -61,7 +61,7 @@ wails3 task darwin:package:universal # Universal .app bundle
 wails3 task linux:create:deb         # .deb (also linux:create:rpm, linux:create:appimage)
 ```
 
-Set `VERSION=x.y.z` in the environment to stamp the version into the binary. App metadata (name, company, version) lives in [build/config.yml](build/config.yml); after changing it run `wails3 task common:update:build-assets` to regenerate Info.plist, NSIS and nfpm files.
+Set `VERSION=x.y.z` in the environment to stamp the version into the binary. App metadata (name, company, version) lives in [build/config.yml](build/config.yml). Keep `version` numeric (`X.Y.Z`) because Windows installers reject pre-release suffixes; put the full version such as `0.7.0-beta.1` in `displayVersion`, which is what the app shows. After changing it run `wails3 task common:update:build-assets` to regenerate Info.plist, NSIS and nfpm files.
 
 ## Local Testing with MinIO
 

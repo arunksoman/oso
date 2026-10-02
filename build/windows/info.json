@@ -1,10 +1,10 @@
 {
 	"fixed": {
-		"file_version": "0.6.2"
+		"file_version": "0.7.0"
 	},
 	"info": {
 		"0000": {
-			"ProductVersion": "0.6.2",
+			"ProductVersion": "0.7.0",
 			"CompanyName": "StackQuest",
 			"FileDescription": "Oso — Object Storage Operator",
 			"LegalCopyright": "Copyright © 2026 StackQuest",

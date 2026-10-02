@@ -87,8 +87,11 @@ func (a *App) GetVersion() string {
 	return version
 }
 
-// configVersion reads info.version from the embedded build/config.yml
+// configVersion reads the version from the embedded build/config.yml,
+// preferring info.displayVersion (may carry a pre-release suffix) over
+// the numeric info.version used for OS package metadata.
 func configVersion() string {
+	values := map[string]string{}
 	inInfo := false
 	scanner := bufio.NewScanner(bytes.NewReader(buildConfig))
 	for scanner.Scan() {
@@ -97,16 +100,19 @@ func configVersion() string {
 			inInfo = strings.HasPrefix(line, "info:")
 			continue
 		}
-		trimmed := strings.TrimSpace(line)
-		if inInfo && strings.HasPrefix(trimmed, "version:") {
-			v := strings.TrimSpace(strings.TrimPrefix(trimmed, "version:"))
-			if i := strings.Index(v, "#"); i >= 0 {
-				v = strings.TrimSpace(v[:i])
-			}
-			return strings.Trim(v, `"'`)
+		key, value, ok := strings.Cut(strings.TrimSpace(line), ":")
+		if !inInfo || !ok || (key != "version" && key != "displayVersion") {
+			continue
 		}
+		if i := strings.Index(value, "#"); i >= 0 {
+			value = value[:i]
+		}
+		values[key] = strings.Trim(strings.TrimSpace(value), `"'`)
 	}
-	return ""
+	if v := values["displayVersion"]; v != "" {
+		return v
+	}
+	return values["version"]
 }
 
 // ServiceStartup is called by Wails when the application starts

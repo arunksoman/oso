@@ -125,9 +125,16 @@ jobs:
       - name: Stamp version
         if: inputs.version != ''
         run: |
-          # Update info.version in build/config.yml, then regenerate Info.plist, NSIS, nfpm and Windows resource metadata
-          sed -i.bak -E "s/^(  version: )\"[^\"]*\"/\1\"${VERSION}\"/" build/config.yml && rm build/config.yml.bak
-          grep -n '^  version:' build/config.yml
+          # info.version must be numeric X.Y.Z (NSIS and the Windows manifest reject
+          # pre-release suffixes); info.displayVersion keeps the full tag version.
+          NUMERIC_VERSION="${VERSION%%-*}"
+          sed -i.bak -E \
+            -e "s/^(  version: )\"[^\"]*\"/\1\"${NUMERIC_VERSION}\"/" \
+            -e "s/^(  displayVersion: )\"[^\"]*\"/\1\"${VERSION}\"/" \
+            build/config.yml && rm build/config.yml.bak
+          grep -nE '^  (version|displayVersion):' build/config.yml
+          # Regenerate Info.plist, NSIS, nfpm and Windows resource metadata
+
           wails3 update build-assets -name oso -binaryname oso -config build/config.yml -dir build -silent
 
       - name: Package (Linux)
