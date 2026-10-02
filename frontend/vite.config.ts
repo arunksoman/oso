@@ -10,6 +10,16 @@ export default defineConfig({
 		port: Number(process.env.WAILS_VITE_PORT) || 9245,
 		strictPort: true
 	},
+	// Pre-bundle up front; deps discovered mid-session force a full reload that
+	// cancels in-flight requests proxied by Wails ("Proxy error: context canceled").
+	optimizeDeps: {
+		include: [
+			'@hugeicons/core-free-icons',
+			'@hugeicons/svelte',
+			'@tanstack/svelte-virtual',
+			'@wailsio/runtime'
+		]
+	},
 	plugins: [
 		tailwindcss(),
 		sveltekit(),

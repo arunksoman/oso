@@ -1,6 +1,8 @@
 @import "tailwindcss";
+/* Built-in themes stay off: the production CSS minifier merges their selectors
+   into a high-specificity :is(), which then beats the overrides below. */
 @plugin "daisyui/index.js" {
-  themes: light, dark, night;
+  themes: false;
 }
 @plugin "daisyui/theme" {
   name: "night";

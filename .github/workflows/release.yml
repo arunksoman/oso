@@ -35,6 +35,14 @@ jobs:
           pattern: oso-*
           merge-multiple: true
 
+      # The in-app updater downloads oso-windows-amd64.exe, oso-linux-amd64 and
+      # oso-macos-universal.zip (see updater.go) and verifies them against SHA256SUMS.
+      - name: Generate checksums
+        working-directory: artifacts
+        run: |
+          sha256sum oso-linux-amd64 oso-windows-amd64.exe oso-macos-universal.zip > SHA256SUMS
+          cat SHA256SUMS
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -46,5 +54,7 @@ jobs:
             artifacts/oso-linux-amd64
             artifacts/*.deb
             artifacts/*.rpm
+            artifacts/oso-windows-amd64.exe
             artifacts/oso-windows-amd64-installer.exe
             artifacts/oso-macos-universal.zip
+            artifacts/SHA256SUMS

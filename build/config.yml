@@ -12,7 +12,7 @@ info:
   copyright: "Copyright © 2026 StackQuest" # Copyright text
   comments: "Oso — Object Storage Operator. Built using Wails (https://wails.io)" # Comments
   version: "0.7.0" # Numeric X.Y.Z only: Windows (NSIS, manifest) and macOS reject pre-release suffixes
-  displayVersion: "0.7.0-beta.1" # Version shown in the app; may carry a pre-release suffix
+  displayVersion: "0.7.0-beta.2" # Version shown in the app; may carry a pre-release suffix
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
   #                               # Should match the name of your .icon file without the extension
   #                               # If not set and Assets.car exists, defaults to "appicon"

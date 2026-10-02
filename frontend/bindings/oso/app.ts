@@ -15,6 +15,14 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * CheckForUpdates opens the update window and runs the check, download and
+ * install flow. Progress and errors are shown in that window.
+ */
+export function CheckForUpdates(): $CancellablePromise<void> {
+    return $Call.ByID(2675659504);
+}
+
+/**
  * Connect connects to S3 with the given configuration and tests it
  */
 export function Connect(cfg: $models.S3Config): $CancellablePromise<void> {
@@ -82,6 +90,14 @@ export function Disconnect(): $CancellablePromise<void> {
  */
 export function DownloadObject(bucket: string, key: string, destPath: string): $CancellablePromise<void> {
     return $Call.ByID(4258742462, bucket, key, destPath);
+}
+
+/**
+ * GetAvailableUpdate silently checks for a newer release and returns its
+ * version, or an empty string when the app is up to date.
+ */
+export function GetAvailableUpdate(): $CancellablePromise<string> {
+    return $Call.ByID(4024198311);
 }
 
 /**

@@ -1,12 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import HugeiconsIcon from '$lib/components/Icon.svelte';
-  import { BucketIcon, Refresh01Icon, Add01Icon } from '@hugeicons/core-free-icons';
-  import { ListBuckets, GetVersion, CreateBucket } from '$bindings/oso/app';
+  import { BucketIcon, Refresh01Icon, Add01Icon, Download01Icon } from '@hugeicons/core-free-icons';
+  import {
+    ListBuckets,
+    GetVersion,
+    CreateBucket,
+    GetAvailableUpdate,
+    CheckForUpdates
+  } from '$bindings/oso/app';
   import { appState } from '$lib/stores/appState.svelte';
   import type { Bucket } from '$lib/stores/appState.svelte';
 
   let appVersion = $state('');
+  let updateVersion = $state('');
   let showNewBucket = $state(false);
   let newBucketName = $state('');
   let creating = $state(false);
@@ -40,6 +47,10 @@
   onMount(() => {
     loadBuckets();
     GetVersion().then((v) => { appVersion = v; });
+    // Silent startup check; being offline or rate limited is not worth a toast
+    GetAvailableUpdate()
+      .then((v) => { updateVersion = v; })
+      .catch(() => {});
   });
 
   async function handleCreateBucket() {
@@ -174,8 +185,20 @@
         s3://{appState.currentBucket}
       </p>
     {/if}
+    {#if updateVersion}
+      <button class="btn btn-primary btn-xs w-full" onclick={() => CheckForUpdates()}>
+        <HugeiconsIcon icon={Download01Icon} size={13} />
+        Update to v{updateVersion}
+      </button>
+    {/if}
     {#if appVersion}
-      <p class="text-xs text-base-content/40">v{appVersion}</p>
+      <button
+        class="text-xs text-base-content/40 hover:text-base-content/70 cursor-pointer"
+        onclick={() => CheckForUpdates()}
+        title="Check for updates"
+      >
+        v{appVersion}
+      </button>
     {/if}
   </div>
 </aside>

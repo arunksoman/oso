@@ -19,11 +19,13 @@ func init() {
 }
 
 func main() {
+	service := NewApp()
+
 	app := application.New(application.Options{
 		Name:        "Oso",
 		Description: "Oso — Object Storage Operator",
 		Services: []application.Service{
-			application.NewService(NewApp()),
+			application.NewService(service),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -32,6 +34,10 @@ func main() {
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 	})
+
+	if err := initUpdater(app, service.GetVersion()); err != nil {
+		log.Printf("updater disabled: %v", err)
+	}
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "Oso — Object Storage Operator",

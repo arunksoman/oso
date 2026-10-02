@@ -40,6 +40,7 @@ pnpm run format
 - Runtime access goes through `application.Get()`: `.Event.Emit(...)` and `.Dialog...`. There is no stored context.
 - Wails v3 on Windows returns a "cancelled" error when the user closes a dialog. `ignoreCancel` in `dialogs.go` turns that into an empty result, which is what the frontend expects.
 - Uploads emit `upload:folder:start`, `upload:progress`, `upload:done` and `upload:error`. The event payload structs live in `s3_upload.go`.
+- Auto-update (`updater.go`) uses the Wails `app.Updater` with the GitHub Releases provider and the built-in update window. `updateAssetName` must match the asset names `release.yml` publishes (`oso-windows-amd64.exe`, `oso-linux-amd64`, `oso-macos-universal.zip`), which are verified against the `SHA256SUMS` asset. Builds with a pre-release version follow pre-releases; stable builds only see stable releases.
 - Move is implemented as copy + delete, and folder operations recurse over `ListObjectsV2` pages.
 
 ### Go ↔ frontend contract
@@ -52,12 +53,12 @@ pnpm run format
 - SvelteKit with `adapter-static` outputs to `frontend/dist`. `+layout.ts` sets `ssr = false` and `prerender = true`, and the whole app is the single route `src/routes/+page.svelte`. That page checks the connection, registers the upload event listeners, and switches between `SetupScreen` and the main shell (Sidebar, TitleBar, Toolbar and FileExplorer, plus modals, the upload panel and toasts).
 - All global state lives in one class-based runes store, `appState` (`src/lib/stores/appState.svelte.ts`). Components mutate it directly. Modals are toggled by `show*` flags, and listings reload through `refreshTrigger`.
 - `FileExplorer.svelte` coordinates the explorer subcomponents in `components/explorer/`. It handles paginated listing (continuation tokens with `settings.pageSize`), server-side search via `SearchObjects`, clipboard copy/cut/paste, keyboard shortcuts and uploads. Rows are virtualized with `@tanstack/svelte-virtual`.
-- i18n uses Paraglide (`messages/en.json`, `es.json`). Themes are DaisyUI `night` (default) and `light`, set through `data-theme` on `<html>`.
+- i18n uses Paraglide (`messages/en.json`, `es.json`). Themes are DaisyUI `night` (default) and `light`, set through `data-theme` on `<html>`. Both are redefined in `app.css` with `themes: false` on the main plugin; re-enabling the built-in themes brings back rounded corners in production builds.
 
 ### Build / CI
 - `Taskfile.yml` dispatches to `build/{windows,darwin,linux}/Taskfile.yml`, with shared tasks in `build/Taskfile.yml`. Mobile targets were removed on purpose. `wails3 update build-assets` recreates a gitignored `build/ios`.
 - `build/config.yml` is the source of truth for product metadata. Info.plist, NSIS, nfpm and `windows/info.json` are generated from it.
-- `.github/workflows/build.yml` runs on push to main, on PRs and when called by another workflow. It runs a check job, then builds Linux (binary, deb, rpm), Windows (NSIS) and macOS (universal zip). `release.yml` runs on `v*` tags: it writes the tag version into `build/config.yml` and calls `build.yml`. Linux builds need `libgtk-4-dev` and `libwebkitgtk-6.0-dev`.
+- `.github/workflows/build.yml` runs on push to main (so on merge, not on PRs), on manual dispatch and when called by another workflow. It runs a check job, then builds Linux (binary, deb, rpm), Windows (NSIS) and macOS (universal zip). `release.yml` runs on `v*` tags: it writes the tag version into `build/config.yml` and calls `build.yml`. Linux builds need `libgtk-4-dev` and `libwebkitgtk-6.0-dev`.
 
 ## Project conventions
 - **Svelte 5 runes only**: `$state`, `$derived`, `$effect`, `$props`. Don't use `let`-based reactivity, `$:` or `export let`.
