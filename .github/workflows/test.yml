@@ -130,16 +130,21 @@ jobs:
       - name: Build server-mode app
         run: go build -tags server -buildvcs=false -o bin/oso-server .
 
+      # minio/minio is no longer published on Docker Hub, so docker-compose.yaml
+      # cannot pull it on a fresh machine. The Chainguard image runs as a
+      # non-root user that cannot write /data, hence --user 0.
       - name: Start MinIO
         run: |
-          docker compose up -d minio
+          docker run -d --name minio --user 0 -p 9000:9000 \
+            -e MINIO_ROOT_USER=osodev -e MINIO_ROOT_PASSWORD=osodevpass \
+            cgr.dev/chainguard/minio:latest server /data
           for attempt in $(seq 1 60); do
             if curl -fsS http://localhost:9000/minio/health/live > /dev/null; then
               exit 0
             fi
             sleep 2
           done
-          docker compose logs minio
+          docker logs minio
           exit 1
 
       - name: Install Playwright browser
