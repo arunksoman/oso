@@ -18,15 +18,17 @@ wails3 task common:generate:bindings   # regenerate frontend/bindings after chan
 wails3 task common:update:build-assets # after editing build/config.yml (name, version, company)
 
 go vet ./...
-go test ./...                    # no Go tests exist yet; single test: go test -run TestName ./...
+go test ./...                    # single test: go test -run TestName ./...
 
 cd frontend
 pnpm run check                   # svelte-kit sync + svelte-check (type check)
+pnpm run test                    # vitest; single file: pnpm exec vitest run src/lib/utils/format.test.ts
 pnpm run lint                    # prettier --check + eslint
 pnpm run format
 ```
 
 - **Versioning** (`build/config.yml`): `info.version` must be numeric `X.Y.Z`, because NSIS rejects pre-release suffixes. `info.displayVersion` is the version shown in the side panel and may carry a suffix (e.g. `0.7.0-beta.1`). After editing either, run `common:update:build-assets`. `VERSION=...` in the environment stamps `-X main.version` into production builds; without it, `GetVersion()` reads `displayVersion`, then `version`, from the embedded config.
+- **Tests**: Go tests sit next to the code as `*_test.go`. S3 calls run against the in-memory `fakeS3` server in `testutil_test.go` (`newConnectedApp`), and `isolateHome` keeps tests away from the real `~/.oso`. Frontend tests are `src/**/*.test.ts` (Vitest, happy-dom, `@testing-library/svelte`); component tests mock `$bindings/oso/app` with `vi.mock`.
 - `pnpm run check` reports missing `$lib/paraglide/*` modules until a Vite build or dev run has generated `src/lib/paraglide`.
 - Local MinIO for testing: `docker compose up -d`. The API is at `localhost:9000` and the console at `localhost:9001`. Credentials are `osodev` / `osodevpass`, region `us-east-1`, and the `oso-test` bucket is created automatically. The app can also skip the setup screen through the `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` and `S3_REGION` environment variables.
 

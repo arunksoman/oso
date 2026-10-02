@@ -2,7 +2,8 @@ import { paraglideVitePlugin } from '@inlang/paraglide-js';
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import wails from '@wailsio/runtime/plugins/vite';
-import { defineConfig } from 'vite';
+import { svelteTesting } from '@testing-library/svelte/vite';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
 	server: {
@@ -24,6 +25,11 @@ export default defineConfig({
 		tailwindcss(),
 		sveltekit(),
 		paraglideVitePlugin({ project: './project.inlang', outdir: './src/lib/paraglide' }),
-		wails('./bindings')
-	]
+		wails('./bindings'),
+		svelteTesting()
+	],
+	test: {
+		environment: 'happy-dom',
+		include: ['src/**/*.test.ts']
+	}
 });

@@ -1,12 +1,22 @@
 <script lang="ts">
   import HugeiconsIcon from '$lib/components/Icon.svelte';
-  import { Settings01Icon, WifiError02Icon } from '@hugeicons/core-free-icons';
+  import {
+    Settings01Icon,
+    WifiError02Icon,
+    Refresh01Icon,
+    Download01Icon,
+    Tick01Icon,
+    Alert02Icon,
+  } from '@hugeicons/core-free-icons';
   import {
     SaveSettings,
     GetSavedConfig,
     Connect,
     Disconnect,
     OpenDirectoryDialog,
+    GetVersion,
+    GetAvailableUpdate,
+    CheckForUpdates,
   } from '$bindings/oso/app';
   import { appState } from '$lib/stores/appState.svelte';
   import type { AppSettings, S3Config } from '$lib/stores/appState.svelte';
@@ -21,8 +31,36 @@
   let reconnecting = $state(false);
   let connError = $state('');
 
+  type UpdateStatus = 'idle' | 'checking' | 'latest' | 'available' | 'error';
+  let appVersion = $state('');
+  let updateVersion = $state('');
+  let updateStatus = $state<UpdateStatus>('idle');
+  let updateError = $state('');
+
+  async function checkForUpdate() {
+    updateStatus = 'checking';
+    updateError = '';
+    try {
+      updateVersion = await GetAvailableUpdate();
+      updateStatus = updateVersion ? 'available' : 'latest';
+    } catch (e) {
+      updateError = String(e);
+      updateStatus = 'error';
+    }
+  }
+
+  function installUpdate() {
+    // Opens the built-in update window, which handles download and install
+    CheckForUpdates();
+    close();
+  }
+
   async function init() {
     settings = { ...appState.settings };
+    updateStatus = 'idle';
+    GetVersion()
+      .then((v) => { appVersion = v; })
+      .catch(() => {});
     try {
       const saved = await GetSavedConfig();
       if (saved) config = { ...saved };
@@ -148,6 +186,48 @@
               <p class="text-xs text-base-content/40">
                 Number of items fetched per scroll page. S3 caps each API request at 1000 — larger values mean fewer round-trips but slower initial loads in big buckets.
               </p>
+            </div>
+          </div>
+
+          <!-- Updates -->
+          <div class="border-t border-base-300 pt-4">
+            <p class="text-xs font-bold uppercase tracking-widest text-base-content/30 mb-3">Updates</p>
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex flex-col gap-1 min-w-0">
+                <span class="text-sm">Current version {appVersion ? `v${appVersion}` : '—'}</span>
+                {#if updateStatus === 'latest'}
+                  <span class="flex items-center gap-1.5 text-xs text-success">
+                    <HugeiconsIcon icon={Tick01Icon} size={13} />
+                    You're up to date
+                  </span>
+                {:else if updateStatus === 'available'}
+                  <span class="text-xs text-primary">Version v{updateVersion} is available</span>
+                {:else if updateStatus === 'error'}
+                  <span class="flex items-start gap-1.5 text-xs text-error">
+                    <HugeiconsIcon icon={Alert02Icon} size={13} class="shrink-0 mt-0.5" />
+                    <span class="wrap-break-word min-w-0">{updateError}</span>
+                  </span>
+                {/if}
+              </div>
+              {#if updateStatus === 'available'}
+                <button class="btn btn-primary btn-sm gap-2 shrink-0" onclick={installUpdate}>
+                  <HugeiconsIcon icon={Download01Icon} size={14} />
+                  Update to v{updateVersion}
+                </button>
+              {:else}
+                <button
+                  class="btn btn-outline btn-sm gap-2 shrink-0"
+                  onclick={checkForUpdate}
+                  disabled={updateStatus === 'checking'}
+                >
+                  {#if updateStatus === 'checking'}
+                    <span class="loading loading-spinner loading-xs"></span>
+                  {:else}
+                    <HugeiconsIcon icon={Refresh01Icon} size={14} />
+                  {/if}
+                  Check for updates
+                </button>
+              {/if}
             </div>
           </div>
 

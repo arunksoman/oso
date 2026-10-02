@@ -64,6 +64,10 @@ jobs:
         working-directory: frontend
         run: pnpm run check
 
+      - name: Frontend test
+        working-directory: frontend
+        run: pnpm run test
+
   build:
     name: Build (${{ matrix.name }})
     needs: check
