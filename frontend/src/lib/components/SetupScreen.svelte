@@ -105,8 +105,8 @@
       {/if}
 
       <button
+        type="submit"
         class="btn btn-primary w-full mt-1"
-        onclick={handleConnect}
         disabled={connecting}
       >
         {#if connecting}

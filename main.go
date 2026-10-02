@@ -18,9 +18,8 @@ func init() {
 	application.RegisterEvent[UploadErrorEvent](EventUploadError)
 }
 
-func main() {
-	service := NewApp()
-
+// newApplication builds the Wails app with its service, updater and main window
+func newApplication(service *App) *application.App {
 	app := application.New(application.Options{
 		Name:        "Oso",
 		Description: "Oso — Object Storage Operator",
@@ -50,7 +49,11 @@ func main() {
 		URL:              "/",
 	})
 
-	if err := app.Run(); err != nil {
+	return app
+}
+
+func main() {
+	if err := newApplication(NewApp()).Run(); err != nil {
 		log.Fatal(err)
 	}
 }

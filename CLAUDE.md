@@ -18,22 +18,32 @@ wails3 task common:generate:bindings   # regenerate frontend/bindings after chan
 wails3 task common:update:build-assets # after editing build/config.yml (name, version, company)
 
 go vet ./...
-go test ./...                    # no Go tests exist yet; single test: go test -run TestName ./...
+go test ./...                    # fast Go tests; single test: go test -run TestName ./...
+CGO_ENABLED=0 go test -tags server ./...   # adds the tests that start a headless Wails app (needs frontend/dist)
+wails3 task test                 # Go + frontend unit tests with the 95% coverage gates
+wails3 task test:e2e             # Playwright against the server-mode build; needs `docker compose up -d`
 
 cd frontend
 pnpm run check                   # svelte-kit sync + svelte-check (type check)
+pnpm run test                    # vitest; single file: pnpm exec vitest run src/lib/utils/format.test.ts
+pnpm run test:coverage           # vitest with coverage thresholds (report in frontend/coverage)
+pnpm run test:e2e                # playwright; single test: pnpm exec playwright test -g "creates a folder"
 pnpm run lint                    # prettier --check + eslint
 pnpm run format
 ```
 
 - **Versioning** (`build/config.yml`): `info.version` must be numeric `X.Y.Z`, because NSIS rejects pre-release suffixes. `info.displayVersion` is the version shown in the side panel and may carry a suffix (e.g. `0.7.0-beta.1`). After editing either, run `common:update:build-assets`. `VERSION=...` in the environment stamps `-X main.version` into production builds; without it, `GetVersion()` reads `displayVersion`, then `version`, from the embedded config.
+- **Tests** come in three layers, all gated in CI:
+  - **Go** (`*_test.go` next to the code). S3 calls run against the in-memory `fakeS3` server in `testutil_test.go` (`newConnectedApp`), and `isolateHome` keeps tests away from the real `~/.oso`. `wails_app_test.go` is built only with `-tags server`: that tag selects the headless Wails implementation, so those tests run a real `application.App` (updater against a fake GitHub API, dialogs, HTTP asset serving) on every OS without a display. Build it with `CGO_ENABLED=0`: with cgo on, Linux still links GTK and WebKit under the server tag. `scripts/go-coverage.mjs` runs the suite that way and fails below 95% statement coverage.
+  - **Frontend unit** (`src/**/*.test.ts`; Vitest, happy-dom, `@testing-library/svelte`). `src/test/setup.ts` auto-mocks every binding in `$bindings/oso/app` and replaces `@wailsio/runtime`, resets `appState` before each test and cancels leftover timers; tests set binding results with `vi.mocked(...)`. `FileExplorer.test.ts` swaps the virtualizer for a stand-in because happy-dom has no layout. Thresholds are in `vite.config.ts`: 95% statements, functions and lines, 90% branches.
+  - **End-to-end** (`frontend/e2e`, Playwright). `playwright.config.ts` starts two copies of the server-mode build (`bin/oso-server`), one connected to MinIO through `S3_*` and one unconfigured for the setup screen, each with its own temporary home directory. `e2e/s3.ts` seeds and inspects MinIO directly. Native file dialogs and window controls do not exist in server mode, so uploads through the dialog are covered by the unit layers only.
 - `pnpm run check` reports missing `$lib/paraglide/*` modules until a Vite build or dev run has generated `src/lib/paraglide`.
 - Local MinIO for testing: `docker compose up -d`. The API is at `localhost:9000` and the console at `localhost:9001`. Credentials are `osodev` / `osodevpass`, region `us-east-1`, and the `oso-test` bucket is created automatically. The app can also skip the setup screen through the `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` and `S3_REGION` environment variables.
 
 ## Architecture
 
 ### Go backend (package `main`, repo root)
-- `main.go` creates the app and one frameless window (1020×740 minimum). It registers a single service, `App`, and embeds `frontend/dist`. Its `init()` registers the typed upload events with `application.RegisterEvent[T]`; registration has to stay in `init` so the binding generator can discover it.
+- `main.go` creates the app and one frameless window (1020×740 minimum) in `newApplication`, which the tests also call. It registers a single service, `App`, and embeds `frontend/dist`. Its `init()` registers the typed upload events with `application.RegisterEvent[T]`; registration has to stay in `init` so the binding generator can discover it.
 - `App` (in `app.go`) is the only bound service. Every exported method on `*App` across `app.go`, `s3_*.go`, `dialogs.go` and `settings.go` becomes a frontend-callable function.
 - `ServiceStartup` loads the S3 config: environment variables first, then `~/.oso/config.json`. Settings persist to `~/.oso/settings.json`.
 - The S3 client uses path-style addressing and checksums "when required", for compatibility with non-AWS backends. Keep both settings when touching `connectWithConfig`.
@@ -58,7 +68,8 @@ pnpm run format
 ### Build / CI
 - `Taskfile.yml` dispatches to `build/{windows,darwin,linux}/Taskfile.yml`, with shared tasks in `build/Taskfile.yml`. Mobile targets were removed on purpose. `wails3 update build-assets` recreates a gitignored `build/ios`.
 - `build/config.yml` is the source of truth for product metadata. Info.plist, NSIS, nfpm and `windows/info.json` are generated from it.
-- `.github/workflows/build.yml` runs on push to main (so on merge, not on PRs), on manual dispatch and when called by another workflow. It runs a check job, then builds Linux (binary, deb, rpm), Windows (NSIS) and macOS (universal zip). `release.yml` runs on `v*` tags: it writes the tag version into `build/config.yml` and calls `build.yml`. Linux builds need `libgtk-4-dev` and `libwebkitgtk-6.0-dev`.
+- `.github/workflows/test.yml` runs on pull requests, on manual dispatch and when called by `build.yml`. Its unit job runs on Linux, Windows and macOS (Go tests with `-tags server` and the coverage gate, frontend tests with coverage thresholds); its end-to-end job runs Playwright on Linux against MinIO. It needs no Wails CLI or GTK packages.
+- `.github/workflows/build.yml` runs on push to main (so on merge, not on PRs), on manual dispatch and when called by another workflow. It runs a check job and `test.yml`, and only then builds Linux (binary, deb, rpm), Windows (NSIS) and macOS (universal zip). `release.yml` runs on `v*` tags: it writes the tag version into `build/config.yml` and calls `build.yml`, so a release is published only when the tests and coverage gates pass. Linux builds need `libgtk-4-dev` and `libwebkitgtk-6.0-dev`.
 
 ## Project conventions
 - **Svelte 5 runes only**: `$state`, `$derived`, `$effect`, `$props`. Don't use `let`-based reactivity, `$:` or `export let`.
