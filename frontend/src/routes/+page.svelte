@@ -1,16 +1,16 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import HugeiconsIcon from '$lib/components/Icon.svelte';
-  import { Copy01Icon, Cancel01Icon, Tick01Icon, Alert02Icon, InformationCircleIcon } from '@hugeicons/core-free-icons';
-  import { IsConnected, GetSettings } from '$bindings/oso/app';
   import { Events } from '@wailsio/runtime';
   import { appState } from '$lib/stores/appState.svelte';
+  import { listenForSharedState, loadSharedState } from '$lib/stores/sync';
   import SetupScreen from '$lib/components/SetupScreen.svelte';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import TitleBar from '$lib/components/TitleBar.svelte';
   import Toolbar from '$lib/components/Toolbar.svelte';
   import FileExplorer from '$lib/components/FileExplorer.svelte';
-  import SettingsModal from '$lib/components/SettingsModal.svelte';
+  import ObjectPropertiesPanel from '$lib/components/ObjectPropertiesPanel.svelte';
+  import DeleteBucketModal from '$lib/components/DeleteBucketModal.svelte';
+  import Toast from '$lib/components/Toast.svelte';
   import PresignedUrlModal from '$lib/components/PresignedUrlModal.svelte';
   import DeleteConfirmModal from '$lib/components/DeleteConfirmModal.svelte';
   import UploadProgressPanel from '$lib/components/UploadProgressPanel.svelte';
@@ -18,13 +18,11 @@
   let checking = $state(true);
 
   onMount(async () => {
+    // Settings and connection changes made in the settings window
+    listenForSharedState();
+
     try {
-      const connected = await IsConnected();
-      appState.connected = connected;
-      if (connected) {
-        const s = await GetSettings();
-        appState.settings = { ...appState.settings, ...s };
-      }
+      await loadSharedState();
     } catch (e) {
       console.error('Startup error:', e);
     } finally {
@@ -105,13 +103,16 @@
     <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
       <TitleBar />
       <Toolbar />
-      <FileExplorer />
+      <div class="flex flex-1 min-h-0 overflow-hidden">
+        <FileExplorer />
+        <ObjectPropertiesPanel />
+      </div>
     </div>
   </div>
 
   <!-- Modals (rendered as fixed overlays) -->
-  {#if appState.showSettings}
-    <SettingsModal />
+  {#if appState.deleteBucketTarget}
+    <DeleteBucketModal />
   {/if}
   {#if appState.showPresignedUrl}
     <PresignedUrlModal />
@@ -123,53 +124,6 @@
   <!-- Floating upload progress -->
   <UploadProgressPanel />
 
-  <!-- Toast notification -->
-  {#if appState.notification}
-    {@const t = appState.notification.type}
-    <div class="fixed bottom-4 right-4 z-50 max-w-md animate-in slide-in-from-bottom-2">
-      <div class="flex items-stretch rounded-box shadow-2xl overflow-hidden border border-base-300 bg-base-100">
-        <!-- Color accent bar -->
-        <div
-          class="w-1.5 shrink-0"
-          class:bg-success={t === 'success'}
-          class:bg-error={t === 'error'}
-          class:bg-warning={t === 'warning'}
-          class:bg-info={t === 'info'}
-        ></div>
-        <!-- Icon -->
-        <div class="flex items-center px-3">
-          {#if t === 'success'}
-            <span class="text-success"><HugeiconsIcon icon={Tick01Icon} size={18} /></span>
-          {:else if t === 'error'}
-            <span class="text-error"><HugeiconsIcon icon={Alert02Icon} size={18} /></span>
-          {:else if t === 'warning'}
-            <span class="text-warning"><HugeiconsIcon icon={Alert02Icon} size={18} /></span>
-          {:else}
-            <span class="text-info"><HugeiconsIcon icon={InformationCircleIcon} size={18} /></span>
-          {/if}
-        </div>
-        <!-- Message -->
-        <div class="flex-1 py-2.5 pr-1 text-sm text-base-content select-text wrap-break-word">
-          {appState.notification.message}
-        </div>
-        <!-- Action buttons -->
-        <div class="flex items-center gap-0.5 px-1.5 shrink-0">
-          <button
-            class="btn btn-ghost btn-xs btn-square h-6 w-6 min-h-0 p-0 text-base-content/40 hover:text-base-content/70"
-            title="Copy to clipboard"
-            onclick={() => { navigator.clipboard.writeText(appState.notification?.message ?? ''); }}
-          >
-            <HugeiconsIcon icon={Copy01Icon} size={13} />
-          </button>
-          <button
-            class="btn btn-ghost btn-xs btn-square h-6 w-6 min-h-0 p-0 text-base-content/40 hover:text-base-content/70"
-            title="Dismiss"
-            onclick={() => { appState.notification = null; }}
-          >
-            <HugeiconsIcon icon={Cancel01Icon} size={13} />
-          </button>
-        </div>
-      </div>
-    </div>
-  {/if}
 {/if}
+
+<Toast />

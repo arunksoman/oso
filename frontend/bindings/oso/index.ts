@@ -9,7 +9,11 @@ export {
 export type {
     AppSettings,
     Bucket,
+    ConnectionProfile,
+    FilesDroppedEvent,
     ListObjectsResult,
+    ObjectProperties,
+    ProfilesChangedEvent,
     S3Config,
     S3Object,
     UploadDoneEvent,

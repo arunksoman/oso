@@ -1,16 +1,28 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import HugeiconsIcon from '$lib/components/Icon.svelte';
-  import { BucketIcon, Refresh01Icon, Add01Icon, Download01Icon } from '@hugeicons/core-free-icons';
+  import {
+    BucketIcon,
+    Refresh01Icon,
+    Add01Icon,
+    Download01Icon,
+    Delete02Icon,
+    CloudServerIcon,
+    UnfoldMoreIcon,
+    Tick01Icon,
+    Settings01Icon,
+  } from '@hugeicons/core-free-icons';
   import {
     ListBuckets,
     GetVersion,
     CreateBucket,
     GetAvailableUpdate,
-    CheckForUpdates
+    CheckForUpdates,
+    SwitchProfile,
   } from '$bindings/oso/app';
   import { appState } from '$lib/stores/appState.svelte';
-  import type { Bucket } from '$lib/stores/appState.svelte';
+  import type { Bucket, ConnectionProfile } from '$lib/stores/appState.svelte';
+  import { openSettings } from '$lib/stores/sync';
 
   let appVersion = $state('');
   let updateVersion = $state('');
@@ -18,6 +30,34 @@
   let newBucketName = $state('');
   let creating = $state(false);
   let createError = $state('');
+  let switchingId = $state('');
+
+  const activeProfile = $derived(appState.profiles.find((p) => p.id === appState.activeProfileId));
+
+  /** Close the profile menu, which stays open while something inside has focus */
+  function closeMenu() {
+    (document.activeElement as HTMLElement | null)?.blur();
+  }
+
+  async function switchProfile(profile: ConnectionProfile) {
+    closeMenu();
+    if (profile.id === appState.activeProfileId || switchingId) return;
+    switchingId = profile.id;
+    try {
+      await SwitchProfile(profile.id);
+      appState.applyConnection(profile.id, true);
+      appState.notify(`Connected to "${profile.name}"`, 'success');
+    } catch (e) {
+      appState.notify(String(e), 'error');
+    } finally {
+      switchingId = '';
+    }
+  }
+
+  function manageConnections() {
+    closeMenu();
+    void openSettings('connections');
+  }
 
   /** Svelte action: focus element on mount */
   function focus(node: HTMLElement) { node.focus(); }
@@ -44,8 +84,13 @@
     appState.selectedKeys = new Set();
   }
 
+  // Loads on mount and again whenever the connection or the bucket set changes
+  $effect(() => {
+    void appState.bucketsTrigger;
+    untrack(() => void loadBuckets());
+  });
+
   onMount(() => {
-    loadBuckets();
     GetVersion().then((v) => { appVersion = v; });
     // Silent startup check; being offline or rate limited is not worth a toast
     GetAvailableUpdate()
@@ -94,7 +139,62 @@
   }
 </script>
 
-<aside class="w-56 bg-base-200 flex flex-col shrink-0 border-r border-base-300 overflow-hidden">
+<aside class="w-56 bg-base-200 flex flex-col shrink-0 border-r border-base-300">
+  <!-- Connection switcher -->
+  <div class="dropdown w-full border-b border-base-300">
+    <div
+      tabindex="0"
+      role="button"
+      class="flex items-center gap-2.5 w-full px-3 py-2 cursor-pointer hover:bg-base-300 transition-colors"
+      title="Switch connection"
+    >
+      <span class="shrink-0 text-primary">
+        {#if switchingId}
+          <span class="loading loading-spinner loading-xs"></span>
+        {:else}
+          <HugeiconsIcon icon={CloudServerIcon} size={16} />
+        {/if}
+      </span>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold truncate leading-tight">{activeProfile?.name ?? 'Connection'}</p>
+        <p class="text-xs font-mono text-base-content/40 truncate leading-tight">
+          {activeProfile?.endpoint ?? 'Not saved as a profile'}
+        </p>
+      </div>
+      <span class="shrink-0 text-base-content/40">
+        <HugeiconsIcon icon={UnfoldMoreIcon} size={14} />
+      </span>
+    </div>
+    <ul
+      tabindex="-1"
+      class="dropdown-content menu bg-base-200 border border-base-300 rounded-box shadow-lg z-50 w-64 p-1 mt-1 ml-1 max-h-80 flex-nowrap overflow-y-auto"
+    >
+      {#each appState.profiles as profile (profile.id)}
+        {@const active = profile.id === appState.activeProfileId}
+        <li>
+          <button class="flex items-center gap-2 text-sm" onclick={() => switchProfile(profile)} aria-current={active}>
+            <span class="w-3.5 shrink-0 text-success">
+              {#if active}<HugeiconsIcon icon={Tick01Icon} size={14} />{/if}
+            </span>
+            <span class="flex-1 min-w-0">
+              <span class="block truncate">{profile.name}</span>
+              <span class="block truncate text-xs font-mono text-base-content/40">{profile.endpoint}</span>
+            </span>
+          </button>
+        </li>
+      {/each}
+      {#if appState.profiles.length > 0}
+        <li class="h-px bg-base-300 my-1"></li>
+      {/if}
+      <li>
+        <button class="flex items-center gap-2 text-sm" onclick={manageConnections}>
+          <HugeiconsIcon icon={Settings01Icon} size={14} class="text-base-content/60" />
+          Manage connections
+        </button>
+      </li>
+    </ul>
+  </div>
+
   <!-- Header -->
   <div class="flex items-center justify-between px-3 py-2.5 border-b border-base-300">
     <div class="flex items-center gap-2 text-base-content/50">
@@ -162,18 +262,30 @@
       <p class="text-xs text-base-content/30 text-center py-6 px-4">No buckets found</p>
     {:else}
       {#each appState.buckets as bucket (bucket.name)}
-        <button
-          class="flex items-center gap-2.5 w-full px-3 py-1.5 text-left transition-colors group"
-          class:bg-primary={appState.currentBucket === bucket.name}
-          class:text-primary-content={appState.currentBucket === bucket.name}
-          class:hover:bg-base-300={appState.currentBucket !== bucket.name}
-          onclick={() => selectBucket(bucket)}
+        {@const current = appState.currentBucket === bucket.name}
+        <div
+          class="flex items-center transition-colors group"
+          class:bg-primary={current}
+          class:text-primary-content={current}
+          class:hover:bg-base-300={!current}
         >
-          <span class="shrink-0 flex items-center leading-none {appState.currentBucket === bucket.name ? 'text-primary-content/70' : 'text-warning/60 group-hover:text-warning/80'}">
-            <HugeiconsIcon icon={BucketIcon} size={16} />
-          </span>
-          <span class="text-sm font-medium truncate leading-none">{bucket.name}</span>
-        </button>
+          <button
+            class="flex items-center gap-2.5 flex-1 min-w-0 pl-3 pr-1 py-1.5 text-left"
+            onclick={() => selectBucket(bucket)}
+          >
+            <span class="shrink-0 flex items-center leading-none {current ? 'text-primary-content/70' : 'text-warning/60 group-hover:text-warning/80'}">
+              <HugeiconsIcon icon={BucketIcon} size={16} />
+            </span>
+            <span class="text-sm font-medium truncate leading-none">{bucket.name}</span>
+          </button>
+          <button
+            class="btn btn-ghost btn-xs p-0.5 h-auto min-h-0 mr-1.5 shrink-0 opacity-0 group-hover:opacity-70 focus-visible:opacity-100 hover:opacity-100! hover:text-error"
+            onclick={() => { appState.deleteBucketTarget = bucket.name; }}
+            title="Delete bucket {bucket.name}"
+          >
+            <HugeiconsIcon icon={Delete02Icon} size={13} />
+          </button>
+        </div>
       {/each}
     {/if}
   </div>

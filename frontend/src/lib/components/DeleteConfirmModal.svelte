@@ -23,6 +23,10 @@
       }
       appState.notify(`Deleted ${keys.length} item(s)`, 'success');
       appState.selectedKeys = new Set();
+      const shown = appState.propertiesTarget?.key;
+      if (shown && keys.some((k) => shown === k || (k.endsWith('/') && shown.startsWith(k)))) {
+        appState.propertiesTarget = null;
+      }
       appState.refreshTrigger = Date.now();
     } catch (e) {
       appState.notify(`Delete failed: ${e}`, 'error');

@@ -5,6 +5,7 @@ import {
   OpenMultipleFilesDialog,
   UploadFile,
   UploadFiles,
+  OpenSettingsWindow,
 } from '$bindings/oso/app';
 import { appState } from '$lib/stores/appState.svelte';
 import { deferred, file } from '../../test/helpers';
@@ -77,10 +78,23 @@ describe('Toolbar', () => {
       expect(appState.showNewFolder).toBe(true);
     });
 
-    it('opens settings', async () => {
+    it('opens the settings window', async () => {
+      vi.mocked(OpenSettingsWindow).mockResolvedValue(true);
       render(Toolbar);
+
       await fireEvent.click(screen.getByTitle('Settings'));
-      expect(appState.showSettings).toBe(true);
+
+      await vi.waitFor(() => expect(OpenSettingsWindow).toHaveBeenCalledWith(''));
+      expect(window.open).not.toHaveBeenCalled();
+    });
+
+    it('opens the settings page in server mode, which has no windows', async () => {
+      vi.mocked(OpenSettingsWindow).mockResolvedValue(false);
+      render(Toolbar);
+
+      await fireEvent.click(screen.getByTitle('Settings'));
+
+      await vi.waitFor(() => expect(window.open).toHaveBeenCalledWith('/settings', 'oso-settings'));
     });
   });
 

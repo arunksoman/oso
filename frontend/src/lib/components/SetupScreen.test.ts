@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
-import { Connect } from '$bindings/oso/app';
+import { Connect, GetActiveProfileID, SwitchProfile } from '$bindings/oso/app';
 import { appState } from '$lib/stores/appState.svelte';
-import { deferred } from '../../test/helpers';
+import { deferred, profile } from '../../test/helpers';
 import SetupScreen from './SetupScreen.svelte';
 
 async function fill(values: Record<string, string>) {
@@ -97,5 +97,65 @@ describe('SetupScreen', () => {
 
     pending.resolve();
     await vi.waitFor(() => expect(appState.connected).toBe(true));
+  });
+
+  it('takes over the profile that Connect created', async () => {
+    vi.mocked(GetActiveProfileID).mockResolvedValue('new-profile');
+    render(SetupScreen);
+    await fill(valid);
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+    await vi.waitFor(() => expect(appState.connected).toBe(true));
+
+    expect(appState.activeProfileId).toBe('new-profile');
+  });
+
+  describe('saved connections', () => {
+    const work = profile('work', { name: 'Work' });
+
+    it('are hidden when there are none', () => {
+      render(SetupScreen);
+      expect(screen.queryByText('Saved connections')).toBeNull();
+    });
+
+    it('connect with one click', async () => {
+      appState.profiles = [work, profile('home', { name: 'Home' })];
+      render(SetupScreen);
+
+      await fireEvent.click(screen.getByRole('button', { name: /Work/ }));
+      await vi.waitFor(() => expect(appState.connected).toBe(true));
+
+      expect(SwitchProfile).toHaveBeenCalledWith('work');
+      expect(appState.activeProfileId).toBe('work');
+      expect(Connect).not.toHaveBeenCalled();
+    });
+
+    it('show why a saved connection failed', async () => {
+      vi.mocked(SwitchProfile).mockRejectedValue('connection failed: expired key');
+      appState.profiles = [work];
+      render(SetupScreen);
+
+      await fireEvent.click(screen.getByRole('button', { name: /Work/ }));
+
+      expect(await screen.findByText('connection failed: expired key')).toBeTruthy();
+      expect(appState.connected).toBe(false);
+      expect(screen.getByRole<HTMLButtonElement>('button', { name: /Work/ }).disabled).toBe(false);
+    });
+
+    it('are disabled while one of them connects', async () => {
+      const pending = deferred<void>();
+      vi.mocked(SwitchProfile).mockReturnValue(pending.promise as never);
+      appState.profiles = [work];
+      render(SetupScreen);
+      const button = screen.getByRole<HTMLButtonElement>('button', { name: /Work/ });
+
+      await fireEvent.click(button);
+
+      await vi.waitFor(() => expect(button.disabled).toBe(true));
+      expect(button.querySelector('.loading')).toBeTruthy();
+      expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Connect' }).disabled).toBe(true);
+      pending.resolve();
+      await vi.waitFor(() => expect(appState.connected).toBe(true));
+    });
   });
 });

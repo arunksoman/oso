@@ -90,6 +90,23 @@ describe('DeleteConfirmModal', () => {
     await vi.waitFor(() => expect(appState.showDeleteConfirm).toBe(false));
   });
 
+  it('closes the properties panel of a deleted object', async () => {
+    open(['docs/', 'a.txt']);
+
+    appState.propertiesTarget = { bucket: 'b', key: 'docs/deep/report.pdf', name: 'report.pdf' };
+    await confirmAndWait();
+    expect(appState.propertiesTarget).toBeNull();
+  });
+
+  it('keeps the properties panel of an object that was not deleted', async () => {
+    open(['a.txt']);
+    appState.propertiesTarget = { bucket: 'b', key: 'b.txt', name: 'b.txt' };
+
+    await confirmAndWait();
+
+    expect(appState.propertiesTarget?.key).toBe('b.txt');
+  });
+
   it('cancels without deleting', async () => {
     open(['a.txt']);
 

@@ -1,12 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,12 +21,26 @@ import (
 type fakeS3 struct {
 	mu      sync.Mutex
 	buckets map[string]map[string][]byte
+	// meta holds object headers, keyed by "bucket/key"
+	meta map[string]fakeMeta
+	// noTagging makes the tagging API fail, like backends that lack it
+	noTagging bool
 	// pageCap limits list pages below the requested max-keys to force pagination
 	pageCap int
 	// deny makes every request fail with 403 AccessDenied
 	deny bool
 	// denyMethod fails only requests with this HTTP method
 	denyMethod string
+}
+
+// fakeMeta is what HeadObject reports besides the body
+type fakeMeta struct {
+	contentType  string
+	cacheControl string
+	metadata     map[string]string
+	tags         map[string]string
+	// size overrides the reported content length when positive
+	size int64
 }
 
 type fakeListEntry struct {
@@ -34,7 +51,7 @@ type fakeListEntry struct {
 
 func newFakeS3(t *testing.T) (*fakeS3, *httptest.Server) {
 	t.Helper()
-	f := &fakeS3{buckets: map[string]map[string][]byte{}}
+	f := &fakeS3{buckets: map[string]map[string][]byte{}, meta: map[string]fakeMeta{}}
 	srv := httptest.NewServer(f)
 	t.Cleanup(srv.Close)
 	return f, srv
@@ -47,6 +64,40 @@ func (f *fakeS3) put(bucket, key, body string) {
 		f.buckets[bucket] = map[string][]byte{}
 	}
 	f.buckets[bucket][key] = []byte(body)
+}
+
+func (f *fakeS3) setMeta(bucket, key string, meta fakeMeta) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.meta[bucket+"/"+key] = meta
+}
+
+func (f *fakeS3) getMeta(bucket, key string) fakeMeta {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.meta[bucket+"/"+key]
+}
+
+func (f *fakeS3) hasBucket(bucket string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	_, ok := f.buckets[bucket]
+	return ok
+}
+
+// metaFromHeaders reads the content type and x-amz-meta-* headers of a request
+func metaFromHeaders(r *http.Request) fakeMeta {
+	meta := fakeMeta{
+		contentType:  r.Header.Get("Content-Type"),
+		cacheControl: r.Header.Get("Cache-Control"),
+		metadata:     map[string]string{},
+	}
+	for name, values := range r.Header {
+		if lower := strings.ToLower(name); strings.HasPrefix(lower, "x-amz-meta-") {
+			meta.metadata[strings.TrimPrefix(lower, "x-amz-meta-")] = values[0]
+		}
+	}
+	return meta
 }
 
 func (f *fakeS3) get(bucket, key string) (string, bool) {
@@ -86,8 +137,20 @@ func (f *fakeS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if f.buckets[bucket] == nil {
 			f.buckets[bucket] = map[string][]byte{}
 		}
+	case key == "" && r.Method == http.MethodDelete:
+		if len(f.buckets[bucket]) > 0 {
+			w.WriteHeader(http.StatusConflict)
+			fmt.Fprint(w, `<Error><Code>BucketNotEmpty</Code><Message>The bucket you tried to delete is not empty</Message></Error>`)
+			return
+		}
+		delete(f.buckets, bucket)
+		w.WriteHeader(http.StatusNoContent)
 	case key == "" && r.Method == http.MethodGet:
 		f.listObjects(w, r, bucket)
+	case r.Method == http.MethodHead:
+		f.headObject(w, bucket, key)
+	case r.Method == http.MethodGet && r.URL.Query().Has("tagging"):
+		f.getTagging(w, bucket, key)
 	case r.Method == http.MethodPut && r.Header.Get("x-amz-copy-source") != "":
 		f.copyObject(w, r, bucket, key)
 	case r.Method == http.MethodPut:
@@ -96,6 +159,7 @@ func (f *fakeS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			f.buckets[bucket] = map[string][]byte{}
 		}
 		f.buckets[bucket][key] = body
+		f.meta[bucket+"/"+key] = metaFromHeaders(r)
 	case r.Method == http.MethodGet:
 		body, ok := f.buckets[bucket][key]
 		if !ok {
@@ -107,6 +171,7 @@ func (f *fakeS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(body)
 	case r.Method == http.MethodDelete:
 		delete(f.buckets[bucket], key)
+		delete(f.meta, bucket+"/"+key)
 		w.WriteHeader(http.StatusNoContent)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -116,6 +181,52 @@ func (f *fakeS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func noSuchKey(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusNotFound)
 	fmt.Fprint(w, `<Error><Code>NoSuchKey</Code><Message>The specified key does not exist.</Message></Error>`)
+}
+
+func (f *fakeS3) headObject(w http.ResponseWriter, bucket, key string) {
+	body, ok := f.buckets[bucket][key]
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	meta := f.meta[bucket+"/"+key]
+	size := int64(len(body))
+	if meta.size > 0 {
+		size = meta.size
+	}
+	contentType := meta.contentType
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
+	w.Header().Set("ETag", fmt.Sprintf(`"etag-%d"`, len(body)))
+	w.Header().Set("Last-Modified", "Fri, 02 Jan 2026 03:04:05 GMT")
+	if meta.cacheControl != "" {
+		w.Header().Set("Cache-Control", meta.cacheControl)
+	}
+	for name, value := range meta.metadata {
+		w.Header().Set("x-amz-meta-"+name, value)
+	}
+}
+
+func (f *fakeS3) getTagging(w http.ResponseWriter, bucket, key string) {
+	if f.noTagging {
+		w.WriteHeader(http.StatusNotImplemented)
+		fmt.Fprint(w, `<Error><Code>NotImplemented</Code><Message>Tagging is not supported</Message></Error>`)
+		return
+	}
+	names := make([]string, 0)
+	tags := f.meta[bucket+"/"+key].tags
+	for name := range tags {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	fmt.Fprint(w, `<Tagging><TagSet>`)
+	for _, name := range names {
+		fmt.Fprintf(w, `<Tag><Key>%s</Key><Value>%s</Value></Tag>`, xmlEscape(name), xmlEscape(tags[name]))
+	}
+	fmt.Fprint(w, `</TagSet></Tagging>`)
 }
 
 func xmlEscape(s string) string {
@@ -207,6 +318,15 @@ func (f *fakeS3) copyObject(w http.ResponseWriter, r *http.Request, bucket, key 
 		f.buckets[bucket] = map[string][]byte{}
 	}
 	f.buckets[bucket][key] = body
+	// Like S3: REPLACE takes the headers of the request, COPY keeps those of the source
+	source = srcBucket + "/" + srcKey
+	if r.Header.Get("x-amz-metadata-directive") == "REPLACE" {
+		meta := metaFromHeaders(r)
+		meta.tags = f.meta[source].tags
+		f.meta[bucket+"/"+key] = meta
+	} else {
+		f.meta[bucket+"/"+key] = f.meta[source]
+	}
 	fmt.Fprint(w, `<CopyObjectResult><ETag>&quot;copied&quot;</ETag></CopyObjectResult>`)
 }
 
@@ -234,4 +354,31 @@ func newConnectedApp(t *testing.T) (*App, *fakeS3) {
 		t.Fatalf("connectWithConfig: %v", err)
 	}
 	return app, fake
+}
+
+// writeLegacyConfig writes the single-connection config.json of older versions
+func writeLegacyConfig(t *testing.T, app *App, cfg S3Config) {
+	t.Helper()
+	if err := os.MkdirAll(app.configDir(), 0700); err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(app.configPath(), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// writeLocal creates a file below dir; rel uses forward slashes
+func writeLocal(t *testing.T, dir, rel, body string) {
+	t.Helper()
+	path := filepath.Join(dir, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(body), 0600); err != nil {
+		t.Fatal(err)
+	}
 }

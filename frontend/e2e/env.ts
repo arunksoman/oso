@@ -26,6 +26,7 @@ export const s3 = {
 	region: 'us-east-1'
 };
 
-/** Buckets owned by the tests; both are removed again in global teardown */
+/** Buckets owned by the tests; all are removed again in global teardown */
 export const bucket = 'oso-e2e';
 export const createdBucket = 'oso-e2e-created';
+export const deletedBucket = 'oso-e2e-deleted';

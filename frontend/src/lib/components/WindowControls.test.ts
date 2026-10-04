@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { Application, Window } from '@wailsio/runtime';
+import { SaveSettings } from '$bindings/oso/app';
 import { appState } from '$lib/stores/appState.svelte';
 import TitleBar from './TitleBar.svelte';
 import WindowControls from './WindowControls.svelte';
@@ -47,6 +48,25 @@ describe('WindowControls', () => {
     await fireEvent.click(toggle);
     expect(appState.settings.theme).toBe('night');
     expect(document.documentElement.getAttribute('data-theme')).toBe('night');
+  });
+
+  it('saves the theme so it reaches the settings window and survives a restart', async () => {
+    render(WindowControls);
+
+    await fireEvent.click(screen.getByRole('checkbox'));
+
+    expect(SaveSettings).toHaveBeenCalledWith(expect.objectContaining({ theme: 'light', pageSize: 1000 }));
+  });
+
+  it('reports when the theme cannot be saved', async () => {
+    vi.mocked(SaveSettings).mockRejectedValue('disk full');
+    render(WindowControls);
+
+    await fireEvent.click(screen.getByRole('checkbox'));
+
+    await vi.waitFor(() =>
+      expect(appState.notification).toEqual({ message: 'Could not save the theme: disk full', type: 'error' }),
+    );
   });
 });
 

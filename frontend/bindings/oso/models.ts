@@ -9,6 +9,7 @@ export interface AppSettings {
     "askBeforeDownload": boolean;
     "showFileDetails": boolean;
     "pageSize": number;
+    "theme": string;
 }
 
 /**
@@ -20,12 +21,69 @@ export interface Bucket {
 }
 
 /**
+ * ConnectionProfile is one saved S3 account
+ */
+export interface ConnectionProfile {
+    "id": string;
+    "name": string;
+    "endpoint": string;
+    "accessKey": string;
+    "secretKey": string;
+    "region": string;
+
+    /**
+     * ReadOnly marks the environment profile, which cannot be edited or deleted
+     */
+    "readOnly": boolean;
+}
+
+/**
+ * FilesDroppedEvent reports files dragged from the OS onto the main window
+ */
+export interface FilesDroppedEvent {
+    "paths": string[] | null;
+
+    /**
+     * Prefix is the folder the files were dropped on; empty means the folder
+     * currently shown
+     */
+    "prefix": string;
+}
+
+/**
  * ListObjectsResult holds paginated listing results
  */
 export interface ListObjectsResult {
     "objects": S3Object[] | null;
     "nextContinuationToken": string;
     "hasMore": boolean;
+}
+
+/**
+ * ObjectProperties holds the HeadObject details and tags of one object
+ */
+export interface ObjectProperties {
+    "bucket": string;
+    "key": string;
+    "size": number;
+    "lastModified": string;
+    "contentType": string;
+    "etag": string;
+    "storageClass": string;
+    "versionId": string;
+    "cacheControl": string;
+    "contentDisposition": string;
+    "contentEncoding": string;
+    "metadata": { [_ in string]?: string } | null;
+    "tags": { [_ in string]?: string } | null;
+}
+
+/**
+ * ProfilesChangedEvent carries the connection state after a profile change
+ */
+export interface ProfilesChangedEvent {
+    "activeId": string;
+    "connected": boolean;
 }
 
 /**

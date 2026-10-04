@@ -62,6 +62,20 @@
   background: transparent;
 }
 
+/* ── Drag and drop ───────────────────────────────────────────────────────── */
+/* The Wails runtime adds file-drop-target-active while files from the OS hover
+   over an element with data-file-drop-target; drop-target-row marks the folder
+   under rows dragged inside the table. */
+.file-drop-target-active,
+.table tbody tr.drop-target-row {
+  outline: 1.5px dashed var(--color-primary);
+  outline-offset: -2px;
+}
+.table tbody tr.file-drop-target-active td,
+.table tbody tr.drop-target-row td {
+  background: color-mix(in oklch, var(--color-primary) 14%, transparent);
+}
+
 /* ── Focus ring ──────────────────────────────────────────────────────────── */
 *:focus-visible {
   outline: 1px solid oklch(var(--p));

@@ -1,8 +1,9 @@
 <script lang="ts">
   import HugeiconsIcon from '$lib/components/Icon.svelte';
-  import { BucketIcon, WifiError02Icon } from '@hugeicons/core-free-icons';
-  import { Connect } from '$bindings/oso/app';
+  import { BucketIcon, WifiError02Icon, CloudServerIcon } from '@hugeicons/core-free-icons';
+  import { Connect, GetActiveProfileID, SwitchProfile } from '$bindings/oso/app';
   import { appState } from '$lib/stores/appState.svelte';
+  import type { ConnectionProfile } from '$lib/stores/appState.svelte';
   import TitleBar from './TitleBar.svelte';
 
   let endpoint = $state('');
@@ -21,11 +22,27 @@
     error = null;
     try {
       await Connect({ endpoint: endpoint.trim(), accessKey: accessKey.trim(), secretKey: secretKey.trim(), region: region.trim() || 'us-east-1' });
-      appState.connected = true;
+      // Connect saved the account as a profile and made it the active one
+      appState.applyConnection((await GetActiveProfileID()) ?? '', true);
     } catch (e) {
       error = String(e);
     } finally {
       connecting = false;
+    }
+  }
+
+  let switchingId = $state('');
+
+  async function useProfile(profile: ConnectionProfile) {
+    switchingId = profile.id;
+    error = null;
+    try {
+      await SwitchProfile(profile.id);
+      appState.applyConnection(profile.id, true);
+    } catch (e) {
+      error = String(e);
+    } finally {
+      switchingId = '';
     }
   }
 </script>
@@ -46,8 +63,40 @@
       </div>
     </div>
 
+    <!-- Saved connections -->
+    {#if appState.profiles.length > 0}
+      <div class="px-8 pt-5 flex flex-col gap-2">
+        <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Saved connections</p>
+        <ul class="flex flex-col border border-base-300 divide-y divide-base-300 max-h-40 overflow-y-auto">
+          {#each appState.profiles as profile (profile.id)}
+            <li>
+              <button
+                type="button"
+                class="flex items-center gap-2.5 w-full px-3 py-2 text-left bg-base-100 hover:bg-base-300 transition-colors"
+                onclick={() => useProfile(profile)}
+                disabled={switchingId !== '' || connecting}
+              >
+                <span class="shrink-0 text-primary">
+                  {#if switchingId === profile.id}
+                    <span class="loading loading-spinner loading-xs"></span>
+                  {:else}
+                    <HugeiconsIcon icon={CloudServerIcon} size={16} />
+                  {/if}
+                </span>
+                <span class="flex-1 min-w-0">
+                  <span class="block text-sm font-medium truncate">{profile.name}</span>
+                  <span class="block text-xs font-mono text-base-content/40 truncate">{profile.endpoint}</span>
+                </span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+        <p class="text-xs text-base-content/30 text-center pt-2">or connect to another account</p>
+      </div>
+    {/if}
+
     <!-- Form -->
-    <form class="px-8 py-6 flex flex-col gap-4" onsubmit={(e) => { e.preventDefault(); handleConnect(); }}>
+    <form class="px-8 {appState.profiles.length > 0 ? 'pt-3 pb-6' : 'py-6'} flex flex-col gap-4" onsubmit={(e) => { e.preventDefault(); handleConnect(); }}>
       <div class="flex flex-col gap-1">
         <label for="setup-endpoint" class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Endpoint URL</label>
         <input
@@ -107,7 +156,7 @@
       <button
         type="submit"
         class="btn btn-primary w-full mt-1"
-        disabled={connecting}
+        disabled={connecting || switchingId !== ''}
       >
         {#if connecting}
           <span class="loading loading-spinner loading-sm"></span>
@@ -119,7 +168,7 @@
     </form>
 
     <div class="px-8 pb-6 text-center text-xs text-base-content/25">
-      Credentials saved to <span class="font-mono">~/.oso/config.json</span>
+      Credentials saved to <span class="font-mono">~/.oso/profiles.json</span>
     </div>
   </div>
   </div>

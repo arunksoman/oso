@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync } from 'node:fs';
-import { bucket, createdBucket, downloadDir, serverBinary } from './env';
+import { bucket, createdBucket, deletedBucket, downloadDir, serverBinary } from './env';
 import { createBucket, removeBucket } from './s3';
 
 export default async function globalSetup() {
@@ -12,6 +12,7 @@ export default async function globalSetup() {
 	try {
 		await createBucket(bucket);
 		await removeBucket(createdBucket);
+		await removeBucket(deletedBucket);
 	} catch (error) {
 		throw new Error('RustFS is not reachable; start it with: docker compose up -d', {
 			cause: error

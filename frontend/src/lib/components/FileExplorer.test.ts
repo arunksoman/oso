@@ -17,7 +17,7 @@ import {
 } from '$bindings/oso/app';
 import { appState } from '$lib/stores/appState.svelte';
 import type { S3Object } from '$lib/stores/appState.svelte';
-import { deferred, file, folder } from '../../test/helpers';
+import { deferred, emitEvent, file, folder } from '../../test/helpers';
 import FileExplorer from './FileExplorer.svelte';
 
 // happy-dom has no layout, so the real virtualizer would render no rows.
@@ -612,6 +612,22 @@ describe('FileExplorer', () => {
       await vi.waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
     });
 
+    it('opens the properties panel for the clicked file', async () => {
+      await open();
+      const menu = await openRowMenu('b.txt');
+
+      await fireEvent.click(menu.getByText('Properties'));
+
+      expect(appState.propertiesTarget).toEqual({ bucket: 'b', key: 'b.txt', name: 'b.txt' });
+      expect(screen.queryByRole('menu')).toBeNull();
+    });
+
+    it('does not offer properties for a folder', async () => {
+      await open();
+      const menu = await openRowMenu('docs');
+      expect(menu.queryByText('Properties')).toBeNull();
+    });
+
     it('opens the presigned URL modal for the clicked file', async () => {
       await open();
       const menu = await openRowMenu('b.txt');
@@ -993,6 +1009,227 @@ describe('FileExplorer', () => {
       await Promise.resolve();
 
       expect(ListObjects).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('drag rows onto a folder', () => {
+    // testing-library hands the handlers its own DataTransfer, so read it off the event
+    function captureTransfer(element: HTMLElement, type: string) {
+      const seen: { transfer: DataTransfer | null } = { transfer: null };
+      element.addEventListener(type, (e) => { seen.transfer = (e as DragEvent).dataTransfer; }, { once: true });
+      return seen;
+    }
+
+    async function drag(name: string) {
+      const seen = captureTransfer(row(name), 'dragstart');
+      await fireEvent.dragStart(row(name), { dataTransfer: {} });
+      return seen.transfer!;
+    }
+
+    it('moves the dragged file into the folder', async () => {
+      await open();
+
+      const dataTransfer = await drag('a.txt');
+      expect(dataTransfer.effectAllowed).toBe('move');
+      expect(dataTransfer.getData('text/plain')).toBe('a.txt');
+      expect(row('a.txt').className).toContain('opacity-50');
+
+      const over = captureTransfer(row('docs'), 'dragover');
+      await fireEvent.dragOver(row('docs'), { dataTransfer: {} });
+      expect(over.transfer!.dropEffect).toBe('move');
+      expect(row('docs').className).toContain('drop-target-row');
+
+      await fireEvent.drop(row('docs'));
+      await vi.waitFor(() => expect(appState.notification).not.toBeNull());
+
+      expect(MoveObject).toHaveBeenCalledWith('b', 'a.txt', 'b', 'docs/a.txt');
+      expect(appState.notification).toEqual({ message: 'Moved 1 item(s) to "docs"', type: 'success' });
+      expect(appState.refreshTrigger).toBeGreaterThan(0);
+      expect(row('docs').className).not.toContain('drop-target-row');
+    });
+
+    it('moves the whole selection when a selected row is dragged', async () => {
+      await open([folder('docs/'), folder('img/'), file('a.txt'), file('b.txt')]);
+      await ctrlClick('a.txt');
+      await ctrlClick('img');
+      appState.clipboard = { operation: 'copy', bucket: 'b', keys: ['a.txt'] };
+      appState.propertiesTarget = { bucket: 'b', key: 'a.txt', name: 'a.txt' };
+
+      await drag('a.txt');
+      await fireEvent.drop(row('docs'));
+      await vi.waitFor(() => expect(appState.notification).not.toBeNull());
+
+      expect(MoveObject).toHaveBeenCalledWith('b', 'a.txt', 'b', 'docs/a.txt');
+      expect(MoveFolder).toHaveBeenCalledWith('b', 'img/', 'b', 'docs/img/');
+      expect(appState.notification).toEqual({ message: 'Moved 2 item(s) to "docs"', type: 'success' });
+      // Moved objects are gone from where the clipboard and the panel knew them
+      expect(selected()).toEqual([]);
+      expect(appState.clipboard).toBeNull();
+      expect(appState.propertiesTarget).toBeNull();
+    });
+
+    it('drags only the grabbed row when it is not part of the selection', async () => {
+      await open();
+      await ctrlClick('b.txt');
+
+      await drag('a.txt');
+      await fireEvent.drop(row('docs'));
+      await vi.waitFor(() => expect(MoveObject).toHaveBeenCalledTimes(1));
+
+      expect(MoveObject).toHaveBeenCalledWith('b', 'a.txt', 'b', 'docs/a.txt');
+    });
+
+    it('does not accept a folder dropped on itself or a drop on a file', async () => {
+      await open();
+      await drag('docs');
+
+      await fireEvent.dragOver(row('docs'));
+      expect(row('docs').className).not.toContain('drop-target-row');
+      await fireEvent.drop(row('docs'));
+      await fireEvent.dragOver(row('a.txt'));
+      await fireEvent.drop(row('a.txt'));
+
+      expect(MoveFolder).not.toHaveBeenCalled();
+      expect(MoveObject).not.toHaveBeenCalled();
+    });
+
+    it('ignores drags that did not start in the table', async () => {
+      await open();
+
+      // Files from the OS are handled by the Wails runtime, not by these handlers
+      await fireEvent.dragOver(row('docs'));
+      await fireEvent.drop(row('docs'));
+
+      expect(row('docs').className).not.toContain('drop-target-row');
+      expect(MoveObject).not.toHaveBeenCalled();
+    });
+
+    it('clears the highlight when the drag leaves the folder or ends', async () => {
+      await open([folder('docs/'), folder('img/'), file('a.txt')]);
+      await drag('a.txt');
+
+      await fireEvent.dragOver(row('docs'));
+      // Leaving a row that is not highlighted changes nothing
+      await fireEvent.dragLeave(row('img'));
+      expect(row('docs').className).toContain('drop-target-row');
+      await fireEvent.dragLeave(row('docs'));
+      expect(row('docs').className).not.toContain('drop-target-row');
+
+      await fireEvent.dragOver(row('docs'));
+      await fireEvent.dragEnd(row('a.txt'));
+      expect(row('docs').className).not.toContain('drop-target-row');
+      expect(row('a.txt').className).not.toContain('opacity-50');
+
+      // The drag is over: a late drop moves nothing
+      await fireEvent.drop(row('docs'));
+      expect(MoveObject).not.toHaveBeenCalled();
+    });
+
+    it('warns when only some items could be moved', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.mocked(MoveObject).mockResolvedValueOnce(undefined).mockRejectedValueOnce('denied');
+      await open();
+      await ctrlClick('a.txt');
+      await ctrlClick('b.txt');
+
+      await drag('a.txt');
+      await fireEvent.drop(row('docs'));
+
+      await vi.waitFor(() =>
+        expect(appState.notification).toEqual({
+          message: 'Moved 1 item(s) to "docs", 1 failed',
+          type: 'warning',
+        })
+      );
+    });
+
+    it('reports when nothing could be moved', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.mocked(MoveObject).mockRejectedValue('denied');
+      await open();
+
+      await drag('a.txt');
+      await fireEvent.drop(row('docs'));
+
+      await vi.waitFor(() =>
+        expect(appState.notification).toEqual({
+          message: 'Move failed for all 1 item(s)',
+          type: 'error',
+        })
+      );
+    });
+  });
+
+  describe('files dropped from the OS', () => {
+    it('marks the list and every folder row as drop targets', async () => {
+      const { container } = await open();
+
+      expect(container.querySelector('[role="region"][data-file-drop-target]')).toBeTruthy();
+      expect(row('docs').getAttribute('data-drop-prefix')).toBe('docs/');
+      expect(row('docs').hasAttribute('data-file-drop-target')).toBe(true);
+      expect(row('a.txt').hasAttribute('data-file-drop-target')).toBe(false);
+    });
+
+    it('uploads into the current folder', async () => {
+      appState.currentPrefix = 'docs/';
+      await open();
+
+      emitEvent('files:dropped', { paths: ['C:\\Users\\me\\report.pdf'], prefix: '' });
+      await vi.waitFor(() => expect(appState.notification).not.toBeNull());
+
+      expect(UploadFiles).toHaveBeenCalledWith('b', 'docs/', ['C:\\Users\\me\\report.pdf']);
+      expect(appState.notification).toEqual({ message: 'Uploaded "report.pdf"', type: 'success' });
+      expect(appState.refreshTrigger).toBeGreaterThan(0);
+    });
+
+    it('uploads into the folder the files were dropped on', async () => {
+      await open();
+
+      emitEvent('files:dropped', { paths: ['/home/me/a.jpg', '/home/me/trip'], prefix: 'docs/' });
+      await vi.waitFor(() => expect(UploadFiles).toHaveBeenCalled());
+
+      expect(UploadFiles).toHaveBeenCalledWith('b', 'docs/', ['/home/me/a.jpg', '/home/me/trip']);
+      expect(appState.uploadBatch).toEqual({ total: 2, done: 0, errors: 0 });
+    });
+
+    it('reports a failed upload and drops the batch', async () => {
+      vi.mocked(UploadFiles).mockRejectedValue('disk error');
+      await open();
+
+      emitEvent('files:dropped', { paths: ['/a.txt', '/b.txt'], prefix: '' });
+
+      await vi.waitFor(() =>
+        expect(appState.notification).toEqual({ message: 'Upload failed: disk error', type: 'error' })
+      );
+      expect(appState.uploadBatch).toBeNull();
+    });
+
+    it('asks for a bucket first', async () => {
+      render(FileExplorer);
+
+      emitEvent('files:dropped', { paths: ['/a.txt'], prefix: '' });
+
+      expect(appState.notification).toEqual({ message: 'Select a bucket first', type: 'error' });
+      expect(UploadFiles).not.toHaveBeenCalled();
+    });
+
+    it('ignores a drop without files', async () => {
+      await open();
+
+      emitEvent('files:dropped', { paths: null, prefix: '' });
+      emitEvent('files:dropped', { paths: [], prefix: '' });
+
+      expect(UploadFiles).not.toHaveBeenCalled();
+    });
+
+    it('stops listening when the explorer goes away', async () => {
+      const { unmount } = await open();
+      const { Events } = await import('@wailsio/runtime');
+      const remove = vi.mocked(Events.On).mock.results[0].value;
+
+      unmount();
+
+      expect(remove).toHaveBeenCalledOnce();
     });
   });
 });

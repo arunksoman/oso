@@ -37,6 +37,9 @@ func TestOperationsRequireConnection(t *testing.T) {
 		"GetPresignedURL": func() error { _, err := app.GetPresignedURL("b", "k", 60); return err },
 		"CreateFolder":    func() error { return app.CreateFolder("b", "", "new") },
 		"UploadFile":      func() error { return app.UploadFile("b", "", "missing.txt") },
+		"DeleteBucket":    func() error { return app.DeleteBucket("b", true) },
+		"GetProperties":   func() error { _, err := app.GetObjectProperties("b", "k"); return err },
+		"SetProperties":   func() error { return app.UpdateObjectProperties("b", "k", "text/plain", nil) },
 	}
 	for name, call := range calls {
 		err := call()

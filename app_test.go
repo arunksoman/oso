@@ -109,27 +109,11 @@ func TestConfigPaths(t *testing.T) {
 	if got, want := app.configPath(), filepath.Join(home, ".oso", "config.json"); got != want {
 		t.Errorf("configPath() = %q, want %q", got, want)
 	}
+	if got, want := app.profilesPath(), filepath.Join(home, ".oso", "profiles.json"); got != want {
+		t.Errorf("profilesPath() = %q, want %q", got, want)
+	}
 	if got, want := app.settingsPath(), filepath.Join(home, ".oso", "settings.json"); got != want {
 		t.Errorf("settingsPath() = %q, want %q", got, want)
-	}
-}
-
-func TestSaveConfigAndLoadConfig(t *testing.T) {
-	isolateHome(t)
-	cfg := S3Config{Endpoint: "http://localhost:9000", AccessKey: "key", SecretKey: "secret", Region: "eu-west-1"}
-
-	if err := NewApp().SaveConfig(cfg); err != nil {
-		t.Fatalf("SaveConfig: %v", err)
-	}
-
-	app := NewApp()
-	app.loadConfig()
-
-	if !app.IsConnected() {
-		t.Fatal("expected a client after loading the saved config")
-	}
-	if got := app.GetSavedConfig(); got == nil || *got != cfg {
-		t.Errorf("GetSavedConfig() = %+v, want %+v", got, cfg)
 	}
 }
 
@@ -166,9 +150,7 @@ func TestLoadConfigIgnoresInvalidJSON(t *testing.T) {
 func TestLoadConfigPrefersEnvironment(t *testing.T) {
 	isolateHome(t)
 	saved := S3Config{Endpoint: "http://saved:9000", AccessKey: "saved", SecretKey: "saved", Region: "eu-west-1"}
-	if err := NewApp().SaveConfig(saved); err != nil {
-		t.Fatal(err)
-	}
+	writeLegacyConfig(t, NewApp(), saved)
 	t.Setenv("S3_ENDPOINT", "http://env:9000")
 	t.Setenv("S3_ACCESS_KEY", "envkey")
 	t.Setenv("S3_SECRET_KEY", "envsecret")
@@ -179,6 +161,14 @@ func TestLoadConfigPrefersEnvironment(t *testing.T) {
 	want := S3Config{Endpoint: "http://env:9000", AccessKey: "envkey", SecretKey: "envsecret", Region: "us-east-1"}
 	if got := app.GetSavedConfig(); got == nil || *got != want {
 		t.Errorf("GetSavedConfig() = %+v, want %+v", got, want)
+	}
+	if got := app.GetActiveProfileID(); got != envProfileID {
+		t.Errorf("GetActiveProfileID() = %q, want %q", got, envProfileID)
+	}
+	// The environment profile is listed first and cannot be edited
+	profiles := app.ListProfiles()
+	if len(profiles) != 2 || profiles[0].ID != envProfileID || !profiles[0].ReadOnly || profiles[1].Endpoint != saved.Endpoint {
+		t.Errorf("ListProfiles() = %+v, want the environment profile and the saved one", profiles)
 	}
 }
 
@@ -238,16 +228,16 @@ func TestConnect(t *testing.T) {
 		t.Error("expected to be connected")
 	}
 
-	data, err := os.ReadFile(app.configPath())
+	data, err := os.ReadFile(app.profilesPath())
 	if err != nil {
-		t.Fatalf("config was not saved: %v", err)
+		t.Fatalf("profiles were not saved: %v", err)
 	}
-	var saved S3Config
+	var saved profileStore
 	if err := json.Unmarshal(data, &saved); err != nil {
 		t.Fatal(err)
 	}
-	if saved != cfg {
-		t.Errorf("saved config = %+v, want %+v", saved, cfg)
+	if len(saved.Profiles) != 1 || saved.Profiles[0].config() != cfg || saved.ActiveID != saved.Profiles[0].ID {
+		t.Errorf("saved profiles = %+v, want one active profile for %+v", saved, cfg)
 	}
 }
 
@@ -265,8 +255,8 @@ func TestConnectFailureClearsClient(t *testing.T) {
 	if app.IsConnected() || app.GetSavedConfig() != nil {
 		t.Error("expected the client and config to be cleared")
 	}
-	if _, statErr := os.Stat(app.configPath()); !os.IsNotExist(statErr) {
-		t.Error("a failed connection must not save the config")
+	if _, statErr := os.Stat(app.profilesPath()); !os.IsNotExist(statErr) {
+		t.Error("a failed connection must not save a profile")
 	}
 }
 

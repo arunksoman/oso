@@ -23,7 +23,8 @@ export function CheckForUpdates(): $CancellablePromise<void> {
 }
 
 /**
- * Connect connects to S3 with the given configuration and tests it
+ * Connect verifies a configuration, saves it as a profile and makes it the
+ * active connection. A profile with the same endpoint and access key is reused.
  */
 export function Connect(cfg: $models.S3Config): $CancellablePromise<void> {
     return $Call.ByID(164877153, cfg);
@@ -58,6 +59,14 @@ export function CreateFolder(bucket: string, prefix: string, folderName: string)
 }
 
 /**
+ * DeleteBucket deletes a bucket. S3 only deletes empty buckets, so with
+ * deleteContents every object in it is removed first.
+ */
+export function DeleteBucket(name: string, deleteContents: boolean): $CancellablePromise<void> {
+    return $Call.ByID(3728638004, name, deleteContents);
+}
+
+/**
  * DeleteFolder recursively deletes all objects under a prefix
  */
 export function DeleteFolder(bucket: string, prefix: string): $CancellablePromise<void> {
@@ -79,7 +88,15 @@ export function DeleteObjects(bucket: string, keys: string[] | null): $Cancellab
 }
 
 /**
- * Disconnect clears the active S3 connection
+ * DeleteProfile removes a saved profile; deleting the active one disconnects
+ */
+export function DeleteProfile(id: string): $CancellablePromise<void> {
+    return $Call.ByID(2457157279, id);
+}
+
+/**
+ * Disconnect clears the active S3 connection. The profiles stay saved, and the
+ * app starts disconnected until one is chosen again.
  */
 export function Disconnect(): $CancellablePromise<void> {
     return $Call.ByID(3864343059);
@@ -90,6 +107,13 @@ export function Disconnect(): $CancellablePromise<void> {
  */
 export function DownloadObject(bucket: string, key: string, destPath: string): $CancellablePromise<void> {
     return $Call.ByID(4258742462, bucket, key, destPath);
+}
+
+/**
+ * GetActiveProfileID returns the ID of the connected profile, or an empty string
+ */
+export function GetActiveProfileID(): $CancellablePromise<string> {
+    return $Call.ByID(3651291183);
 }
 
 /**
@@ -108,6 +132,14 @@ export function GetDownloadsFolder(): $CancellablePromise<string> {
 }
 
 /**
+ * GetObjectProperties returns the metadata of an object. Tags are optional:
+ * backends without tagging support simply report none.
+ */
+export function GetObjectProperties(bucket: string, key: string): $CancellablePromise<$models.ObjectProperties | null> {
+    return $Call.ByID(1906098353, bucket, key);
+}
+
+/**
  * GetPresignedURL generates a presigned download URL for an S3 object
  */
 export function GetPresignedURL(bucket: string, key: string, expirySeconds: number): $CancellablePromise<string> {
@@ -115,7 +147,7 @@ export function GetPresignedURL(bucket: string, key: string, expirySeconds: numb
 }
 
 /**
- * GetSavedConfig returns the saved S3 configuration
+ * GetSavedConfig returns the configuration of the active connection
  */
 export function GetSavedConfig(): $CancellablePromise<$models.S3Config | null> {
     return $Call.ByID(3217435348);
@@ -157,6 +189,14 @@ export function ListObjects(bucket: string, prefix: string, continuationToken: s
 }
 
 /**
+ * ListProfiles returns the saved profiles, preceded by the environment
+ * profile when the app was configured through S3_* variables
+ */
+export function ListProfiles(): $CancellablePromise<$models.ConnectionProfile[] | null> {
+    return $Call.ByID(1957526603);
+}
+
+/**
  * MoveFolder recursively moves all objects under a prefix (copy + delete)
  */
 export function MoveFolder(srcBucket: string, srcPrefix: string, dstBucket: string, dstPrefix: string): $CancellablePromise<void> {
@@ -192,10 +232,13 @@ export function OpenMultipleFilesDialog(): $CancellablePromise<string[] | null> 
 }
 
 /**
- * SaveConfig persists the S3 config to disk
+ * OpenSettingsWindow shows the settings window, creating it on first use, and
+ * selects the given section ("general", "connections", "about"; empty keeps the
+ * current one). It returns false in server mode, where there are no native
+ * windows and the frontend opens the settings page itself.
  */
-export function SaveConfig(cfg: $models.S3Config): $CancellablePromise<void> {
-    return $Call.ByID(3442292638, cfg);
+export function OpenSettingsWindow(section: string): $CancellablePromise<boolean> {
+    return $Call.ByID(3185921024, section);
 }
 
 /**
@@ -206,7 +249,15 @@ export function SaveFileDialog(defaultName: string): $CancellablePromise<string>
 }
 
 /**
- * SaveSettings persists application settings
+ * SaveProfile creates a profile (empty ID) or updates an existing one. Changes
+ * to the active profile are verified first and take effect immediately.
+ */
+export function SaveProfile(profile: $models.ConnectionProfile): $CancellablePromise<$models.ConnectionProfile> {
+    return $Call.ByID(406053493, profile);
+}
+
+/**
+ * SaveSettings persists application settings and tells every window
  */
 export function SaveSettings(settings: $models.AppSettings): $CancellablePromise<void> {
     return $Call.ByID(1949631069, settings);
@@ -221,6 +272,30 @@ export function SearchObjects(bucket: string, prefix: string, query: string, max
 }
 
 /**
+ * SwitchProfile connects to another profile. When the new connection fails,
+ * the current one stays in place.
+ */
+export function SwitchProfile(id: string): $CancellablePromise<void> {
+    return $Call.ByID(3869054282, id);
+}
+
+/**
+ * TestConnection checks a configuration without changing the active connection
+ */
+export function TestConnection(cfg: $models.S3Config): $CancellablePromise<void> {
+    return $Call.ByID(1257240193, cfg);
+}
+
+/**
+ * UpdateObjectProperties replaces the content type and user metadata of an
+ * object by copying it onto itself. The other headers, the storage class and
+ * the tags are carried over.
+ */
+export function UpdateObjectProperties(bucket: string, key: string, contentType: string, metadata: { [_ in string]?: string } | null): $CancellablePromise<void> {
+    return $Call.ByID(358085538, bucket, key, contentType, metadata);
+}
+
+/**
  * UploadFile uploads a local file (or folder) to S3, emitting progress events.
  */
 export function UploadFile(bucket: string, prefix: string, localPath: string): $CancellablePromise<void> {
@@ -228,7 +303,9 @@ export function UploadFile(bucket: string, prefix: string, localPath: string): $
 }
 
 /**
- * UploadFiles uploads multiple local files or folders sequentially.
+ * UploadFiles uploads multiple local files or folders sequentially. A mixed
+ * selection, as produced by dropping files onto the window, is announced as
+ * one batch covering every file inside the folders.
  */
 export function UploadFiles(bucket: string, prefix: string, localPaths: string[] | null): $CancellablePromise<void> {
     return $Call.ByID(1184827635, bucket, prefix, localPaths);

@@ -22,6 +22,10 @@
     ontogglecheck,
     onopenItemMenu,
     onupload,
+    draggedKeys,
+    onrowdragstart,
+    onrowdragend,
+    ondropfolder,
   }: {
     filteredObjects: S3Object[];
     totalSize: number;
@@ -38,13 +42,45 @@
     ontogglecheck: (e: Event, obj: S3Object) => void;
     onopenItemMenu: (e: MouseEvent, obj: S3Object) => void;
     onupload: () => void;
+    /** Keys being dragged from this table; null while nothing is dragged */
+    draggedKeys: string[] | null;
+    onrowdragstart: (e: DragEvent, obj: S3Object) => void;
+    onrowdragend: () => void;
+    ondropfolder: (folder: S3Object) => void;
   } = $props();
+
+  // Folder row under the dragged rows
+  let dropKey = $state<string | null>(null);
+
+  /** Rows can be dropped on any folder that is not being dragged itself */
+  function accepts(obj: S3Object) {
+    return obj.isFolder && draggedKeys !== null && !draggedKeys.includes(obj.key);
+  }
+
+  function handleDragOver(e: DragEvent, obj: S3Object) {
+    if (!accepts(obj)) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    dropKey = obj.key;
+  }
+
+  function handleDragLeave(obj: S3Object) {
+    if (dropKey === obj.key) dropKey = null;
+  }
+
+  function handleDrop(e: DragEvent, obj: S3Object) {
+    dropKey = null;
+    if (!accepts(obj)) return;
+    e.preventDefault();
+    ondropfolder(obj);
+  }
 </script>
 
 <div
   class="flex-1 overflow-y-auto"
   bind:this={listContainerEl}
   role="region"
+  data-file-drop-target
   oncontextmenu={(e) => oncontextmenu(e, null)}
 >
   {#if filteredObjects.length === 0 && !appState.isLoading && !searchBusy}
@@ -110,7 +146,16 @@
                 class="cursor-pointer transition-colors group"
                 class:bg-primary={sel}
                 class:text-primary-content={sel}
-                class:opacity-50={clipped && !sel}
+                class:opacity-50={(clipped && !sel) || !!draggedKeys?.includes(obj.key)}
+                class:drop-target-row={dropKey === obj.key}
+                draggable="true"
+                data-file-drop-target={obj.isFolder ? '' : undefined}
+                data-drop-prefix={obj.isFolder ? obj.key : undefined}
+                ondragstart={(e) => onrowdragstart(e, obj)}
+                ondragend={() => { dropKey = null; onrowdragend(); }}
+                ondragover={(e) => handleDragOver(e, obj)}
+                ondragleave={() => handleDragLeave(obj)}
+                ondrop={(e) => handleDrop(e, obj)}
                 onclick={(e) => onrowclick(e, obj)}
                 ondblclick={() => ondblclick(obj)}
                 oncontextmenu={(e) => oncontextmenu(e, obj)}

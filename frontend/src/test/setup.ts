@@ -11,9 +11,10 @@ vi.mock('@wailsio/runtime', () => ({
   Call: { ByID: vi.fn() },
   CancellablePromise: Promise,
   Create: { Any: (value: unknown) => value },
-  Window: { IsMaximised: vi.fn(), ToggleMaximise: vi.fn(), Minimise: vi.fn() },
+  Window: { IsMaximised: vi.fn(), ToggleMaximise: vi.fn(), Minimise: vi.fn(), Close: vi.fn() },
   Application: { Quit: vi.fn() },
-  Events: { On: vi.fn() },
+  // Like the real runtime, On returns the function that removes the listener
+  Events: { On: vi.fn(() => vi.fn()) },
 }));
 
 // Timers a test leaves behind (toast auto-dismiss, upload cleanup) would fire
@@ -41,6 +42,8 @@ beforeEach(() => {
   }
   vi.mocked(Window.IsMaximised).mockReset().mockResolvedValue(false);
   vi.mocked(Window.ToggleMaximise).mockReset().mockResolvedValue(undefined);
+  // Server mode opens the settings page in a browser window
+  window.open = vi.fn();
   resetAppState();
   document.documentElement.removeAttribute('data-theme');
 });
