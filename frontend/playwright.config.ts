@@ -5,7 +5,7 @@ import { appHome, appURL, s3, serverBinary, setupHome, setupURL } from './e2e/en
 // End-to-end tests drive the real Go backend through a browser. The backend is
 // the server-mode build of the app (`wails3 task build:server` or
 // `go build -tags server`), which serves the same frontend and bindings over
-// HTTP instead of a native window. S3 is a real MinIO (`docker compose up -d`).
+// HTTP instead of a native window. S3 is a real RustFS (`docker compose up -d`).
 
 // The config is loaded again in every worker; only the main process may wipe
 // the home directories the servers are about to start with.

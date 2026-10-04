@@ -18,7 +18,7 @@ export const appHome = join(tmpdir(), 'oso-e2e-app-home');
 export const setupHome = join(tmpdir(), 'oso-e2e-setup-home');
 export const downloadDir = join(appHome, 'downloads');
 
-/** MinIO from docker-compose.yaml unless overridden */
+/** RustFS from docker-compose.yaml unless overridden */
 export const s3 = {
 	endpoint: process.env.E2E_S3_ENDPOINT ?? 'http://localhost:9000',
 	accessKey: process.env.E2E_S3_ACCESS_KEY ?? 'osodev',

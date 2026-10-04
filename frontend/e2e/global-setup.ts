@@ -13,7 +13,7 @@ export default async function globalSetup() {
 		await createBucket(bucket);
 		await removeBucket(createdBucket);
 	} catch (error) {
-		throw new Error('MinIO is not reachable; start it with: docker compose up -d', {
+		throw new Error('RustFS is not reachable; start it with: docker compose up -d', {
 			cause: error
 		});
 	}
