@@ -1,8 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import { appHome, bucket, createdBucket, downloadDir } from './env';
-import { listKeys, readObject, seed } from './s3';
+import { appHome, bucket, createdBucket, deletedBucket, downloadDir } from './env';
+import {
+	bucketExists,
+	createBucket,
+	headObject,
+	listKeys,
+	putObject,
+	readObject,
+	seed
+} from './s3';
+import { openSettings } from './settings';
 
 const row = (page: Page, name: string) => page.locator('tbody tr').filter({ hasText: name });
 const toast = (page: Page, text: string | RegExp) => page.getByText(text).last();
@@ -169,16 +178,20 @@ test.describe('sharing and downloading', () => {
 		expect(await response.text()).toBe('hello from e2e');
 	});
 
-	test('saves settings and downloads into the default folder', async ({ page }) => {
+	test('saves settings in the settings window and downloads into the default folder', async ({
+		page
+	}) => {
 		await seed({ 'download/report.txt': 'quarterly numbers' });
 		await openFolder(page, 'download');
 
-		await page.getByTitle('Settings').click();
-		await page.getByPlaceholder('Default download folder').fill(downloadDir);
-		await page.getByLabel('Ask for save location before each download').uncheck();
-		await page.getByRole('button', { name: 'Save' }).click();
-		await expect(toast(page, 'Settings saved')).toBeVisible();
+		const settings = await openSettings(page);
+		await settings.getByPlaceholder('Default download folder').fill(downloadDir);
+		await settings.getByLabel('Ask for save location before each download').uncheck();
+		await settings.getByRole('button', { name: 'Save' }).click();
+		await expect(toast(settings, 'Settings saved')).toBeVisible();
+		await expect(settings.getByText('All changes saved')).toBeVisible();
 
+		// The explorer takes the saved settings over without a reload
 		await select(page, 'report.txt');
 		await page.getByTitle('Download', { exact: true }).click();
 
@@ -188,10 +201,139 @@ test.describe('sharing and downloading', () => {
 		// Settings are written to ~/.oso/settings.json and survive a reload
 		const saved = JSON.parse(readFileSync(join(appHome, '.oso', 'settings.json'), 'utf8'));
 		expect(saved).toMatchObject({ defaultDownloadPath: downloadDir, askBeforeDownload: false });
-		await page.reload();
-		await page.getByTitle('Settings').click();
-		await expect(page.getByPlaceholder('Default download folder')).toHaveValue(downloadDir);
-		await expect(page.getByLabel('Ask for save location before each download')).not.toBeChecked();
+		await settings.reload();
+		await expect(settings.getByPlaceholder('Default download folder')).toHaveValue(downloadDir);
+		await expect(
+			settings.getByLabel('Ask for save location before each download')
+		).not.toBeChecked();
+	});
+});
+
+test.describe('settings window', () => {
+	test('lists its sections in a sidebar', async ({ page }) => {
+		await page.goto('/');
+		const settings = await openSettings(page);
+		const sections = settings.getByRole('navigation', { name: 'Settings sections' });
+
+		await expect(settings.getByRole('heading', { name: 'General' })).toBeVisible();
+		await expect(sections.getByRole('button', { name: 'General' })).toHaveAttribute(
+			'aria-current',
+			'page'
+		);
+
+		await sections.getByRole('button', { name: 'Connections' }).click();
+		await expect(settings.getByRole('heading', { name: 'Connections' })).toBeVisible();
+		await expect(settings.getByRole('listitem', { name: 'Environment' })).toContainText('Active');
+
+		await sections.getByRole('button', { name: 'About' }).click();
+		await expect(settings.getByText(/Current version v\d+\.\d+\.\d+/)).toBeVisible();
+	});
+
+	test('opens on the connections section from the sidebar', async ({ page }) => {
+		await page.goto('/');
+
+		const settings = await openSettings(page, async () => {
+			await page.getByTitle('Switch connection').click();
+			await page.getByRole('button', { name: 'Manage connections' }).click();
+		});
+
+		await expect(settings.getByRole('heading', { name: 'Connections' })).toBeVisible();
+	});
+
+	test('changes the theme of both windows', async ({ page }) => {
+		await page.goto('/');
+		await expect(page.locator('html')).toHaveAttribute('data-theme', 'night');
+		const settings = await openSettings(page);
+
+		await settings.getByRole('radio', { name: 'Light' }).click();
+		await settings.getByRole('button', { name: 'Save' }).click();
+
+		await expect(settings.locator('html')).toHaveAttribute('data-theme', 'light');
+		await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+
+		// The toggle in the explorer title bar reaches the settings window too
+		await page.locator('label.swap').click();
+		await expect(page.locator('html')).toHaveAttribute('data-theme', 'night');
+		await expect(settings.locator('html')).toHaveAttribute('data-theme', 'night');
+		await expect(settings.getByRole('radio', { name: 'Night' })).toHaveAttribute(
+			'aria-checked',
+			'true'
+		);
+	});
+});
+
+test.describe('object properties', () => {
+	test('shows the properties and edits content type and metadata in place', async ({ page }) => {
+		await seed({ 'props/data.bin': 'payload' });
+		await openFolder(page, 'props');
+
+		await row(page, 'data.bin').click({ button: 'right' });
+		await page.getByRole('menu').getByText('Properties').click();
+
+		const panel = page.getByLabel('Object properties');
+		await expect(panel.getByText(`s3://${bucket}/props/data.bin`)).toBeVisible();
+		await expect(panel.getByText('7 B')).toBeVisible();
+		await expect(panel.getByRole('button', { name: 'Save' })).toBeDisabled();
+
+		await panel.getByLabel('Content-Type').fill('text/plain');
+		await panel.getByRole('button', { name: 'Add' }).click();
+		await panel.getByLabel('Metadata key 1').fill('Owner');
+		await panel.getByLabel('Metadata value 1').fill('e2e');
+		await panel.getByRole('button', { name: 'Save' }).click();
+
+		await expect(toast(page, 'Updated "data.bin"')).toBeVisible();
+		await expect(panel.getByLabel('Metadata key 1')).toHaveValue('owner');
+		expect(await headObject('props/data.bin')).toEqual({
+			contentType: 'text/plain',
+			metadata: { owner: 'e2e' }
+		});
+		expect(await readObject('props/data.bin')).toBe('payload');
+
+		await panel.getByTitle('Close properties').click();
+		await expect(panel).toHaveCount(0);
+	});
+});
+
+test.describe('drag and drop', () => {
+	test('moves a file by dragging its row onto a folder', async ({ page }) => {
+		await seed({ 'drag/a.txt': 'drag me', 'drag/dest/keep.txt': 'x' });
+		await openFolder(page, 'drag');
+
+		await row(page, 'a.txt').dragTo(row(page, 'dest'));
+
+		await expect(toast(page, 'Moved 1 item(s) to "dest"')).toBeVisible();
+		await expect(row(page, 'a.txt')).toHaveCount(0);
+		expect(await listKeys('drag/')).toEqual(['drag/dest/a.txt', 'drag/dest/keep.txt']);
+		expect(await readObject('drag/dest/a.txt')).toBe('drag me');
+	});
+
+	test('moves the whole selection, folders included', async ({ page }) => {
+		await seed({
+			'dragmany/one.txt': '1',
+			'dragmany/sub/two.txt': '2',
+			'dragmany/dest/keep.txt': 'x'
+		});
+		await openFolder(page, 'dragmany');
+		await select(page, 'one.txt');
+		await select(page, 'sub');
+
+		await row(page, 'one.txt').dragTo(row(page, 'dest'));
+
+		await expect(toast(page, 'Moved 2 item(s) to "dest"')).toBeVisible();
+		expect(await listKeys('dragmany/')).toEqual([
+			'dragmany/dest/keep.txt',
+			'dragmany/dest/one.txt',
+			'dragmany/dest/sub/two.txt'
+		]);
+	});
+
+	test('marks the list and its folders as targets for files from the OS', async ({ page }) => {
+		await seed({ 'droptarget/dest/keep.txt': 'x' });
+		await openFolder(page, 'droptarget');
+
+		// Server mode has no native window to drop files on; the unit tests cover the upload
+		await expect(page.locator('[role="region"][data-file-drop-target]')).toBeVisible();
+		await expect(row(page, 'dest')).toHaveAttribute('data-drop-prefix', 'droptarget/dest/');
 	});
 });
 
@@ -218,23 +360,53 @@ test.describe('buckets', () => {
 		await expect(page.getByText('This folder is empty')).toBeVisible();
 		expect(await listKeys('', createdBucket)).toEqual([]);
 	});
+
+	test('deletes a bucket only after its name is typed', async ({ page }) => {
+		await createBucket(deletedBucket);
+		await putObject(deletedBucket, 'leftover/file.txt', 'still here');
+		await page.goto('/');
+		await page.getByRole('button', { name: deletedBucket, exact: true }).click();
+		await expect(row(page, 'leftover')).toBeVisible();
+
+		await page.getByTitle(`Delete bucket ${deletedBucket}`).click();
+		const confirm = page.getByRole('button', { name: 'Delete bucket', exact: true });
+		await expect(confirm).toBeDisabled();
+		await page.getByLabel(/to confirm/).fill('oso-e2e');
+		await expect(confirm).toBeDisabled();
+
+		// S3 refuses to delete a bucket that still has objects
+		await page.getByLabel(/to confirm/).fill(deletedBucket);
+		await confirm.click();
+		await expect(page.getByText(/failed to delete bucket/)).toBeVisible();
+		expect(await bucketExists(deletedBucket)).toBe(true);
+
+		await page.getByLabel(/Delete all objects in the bucket first/).check();
+		await confirm.click();
+
+		await expect(toast(page, `Bucket "${deletedBucket}" deleted`)).toBeVisible();
+		await expect(page.getByRole('button', { name: deletedBucket, exact: true })).toHaveCount(0);
+		await expect(page.getByText('Select a bucket from the sidebar')).toBeVisible();
+		expect(await bucketExists(deletedBucket)).toBe(false);
+		expect(await bucketExists(bucket)).toBe(true);
+	});
 });
 
 test.describe('updates', () => {
-	test('checks for updates from settings', async ({ page }) => {
+	test('checks for updates from the settings window', async ({ page }) => {
 		await page.goto('/');
-		await page.getByTitle('Settings').click();
-		await expect(page.getByText(/Current version v\d+\.\d+\.\d+/)).toBeVisible();
+		const settings = await openSettings(page);
+		await settings.getByRole('button', { name: 'About' }).click();
+		await expect(settings.getByText(/Current version v\d+\.\d+\.\d+/)).toBeVisible();
 
-		await page.getByRole('button', { name: 'Check for updates' }).click();
+		await settings.getByRole('button', { name: 'Check for updates' }).click();
 
 		// The answer depends on the latest GitHub release and on network access;
 		// what matters here is that the check completes and reports one of them.
 		await expect(
-			page
+			settings
 				.getByText("You're up to date")
-				.or(page.getByText(/Version v.+ is available/))
-				.or(page.getByText(/update check failed/))
+				.or(settings.getByText(/Version v.+ is available/))
+				.or(settings.getByText(/update check failed/))
 		).toBeVisible({ timeout: 45_000 });
 	});
 });

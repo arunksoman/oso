@@ -13,6 +13,7 @@ func TestGetSettingsDefaults(t *testing.T) {
 		AskBeforeDownload:   true,
 		ShowFileDetails:     true,
 		PageSize:            1000,
+		Theme:               "night",
 	}
 
 	t.Run("missing file", func(t *testing.T) {
@@ -43,6 +44,7 @@ func TestSaveSettingsRoundTrip(t *testing.T) {
 		AskBeforeDownload:   false,
 		ShowFileDetails:     false,
 		PageSize:            250,
+		Theme:               "light",
 	}
 
 	if err := app.SaveSettings(settings); err != nil {
@@ -63,6 +65,20 @@ func TestGetSettingsRepairsPageSize(t *testing.T) {
 		}
 		if got := app.GetSettings().PageSize; got != 1000 {
 			t.Errorf("PageSize %d loaded as %d, want 1000", pageSize, got)
+		}
+	}
+}
+
+func TestGetSettingsRepairsTheme(t *testing.T) {
+	isolateHome(t)
+	app := NewApp()
+
+	for _, theme := range []string{"", "solarized"} {
+		if err := app.SaveSettings(AppSettings{PageSize: 100, Theme: theme}); err != nil {
+			t.Fatal(err)
+		}
+		if got := app.GetSettings().Theme; got != "night" {
+			t.Errorf("Theme %q loaded as %q, want night", theme, got)
 		}
 	}
 }

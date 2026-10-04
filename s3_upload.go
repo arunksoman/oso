@@ -103,20 +103,27 @@ func (a *App) uploadFileWithKey(bucket, key, localPath string, size int64) error
 	return nil
 }
 
-// uploadFolderContents recursively uploads a local directory to S3, preserving structure.
-func (a *App) uploadFolderContents(bucket, s3Prefix, localFolderPath string) error {
-	folderName := filepath.Base(localFolderPath)
-	destPrefix := s3Prefix + folderName + "/"
-
-	// Count files first so the frontend can show a progress bar.
+// countFiles returns the number of files under a local path
+func countFiles(localPath string) int {
 	total := 0
-	_ = filepath.Walk(localFolderPath, func(_ string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(localPath, func(_ string, info os.FileInfo, err error) error {
 		if err == nil && !info.IsDir() {
 			total++
 		}
 		return nil
 	})
-	emit(EventUploadFolderStart, UploadFolderStartEvent{Total: total})
+	return total
+}
+
+// uploadFolderContents recursively uploads a local directory to S3, preserving structure.
+// With announce, the file count is sent first so the frontend can show a progress bar.
+func (a *App) uploadFolderContents(bucket, s3Prefix, localFolderPath string, announce bool) error {
+	folderName := filepath.Base(localFolderPath)
+	destPrefix := s3Prefix + folderName + "/"
+
+	if announce {
+		emit(EventUploadFolderStart, UploadFolderStartEvent{Total: countFiles(localFolderPath)})
+	}
 
 	return filepath.Walk(localFolderPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -136,6 +143,10 @@ func (a *App) uploadFolderContents(bucket, s3Prefix, localFolderPath string) err
 
 // UploadFile uploads a local file (or folder) to S3, emitting progress events.
 func (a *App) UploadFile(bucket, prefix, localPath string) error {
+	return a.uploadPath(bucket, prefix, localPath, true)
+}
+
+func (a *App) uploadPath(bucket, prefix, localPath string, announce bool) error {
 	if a.s3Client == nil {
 		return fmt.Errorf("not connected to S3")
 	}
@@ -144,17 +155,33 @@ func (a *App) UploadFile(bucket, prefix, localPath string) error {
 		return err
 	}
 	if fi.IsDir() {
-		return a.uploadFolderContents(bucket, prefix, localPath)
+		return a.uploadFolderContents(bucket, prefix, localPath, announce)
 	}
 
 	key := prefix + filepath.Base(localPath)
 	return a.uploadFileWithKey(bucket, key, localPath, fi.Size())
 }
 
-// UploadFiles uploads multiple local files or folders sequentially.
+// UploadFiles uploads multiple local files or folders sequentially. A mixed
+// selection, as produced by dropping files onto the window, is announced as
+// one batch covering every file inside the folders.
 func (a *App) UploadFiles(bucket, prefix string, localPaths []string) error {
+	announce := true
+	if len(localPaths) > 1 {
+		total, hasFolder := 0, false
+		for _, path := range localPaths {
+			if fi, err := os.Stat(path); err == nil && fi.IsDir() {
+				hasFolder = true
+			}
+			total += countFiles(path)
+		}
+		if hasFolder {
+			emit(EventUploadFolderStart, UploadFolderStartEvent{Total: total})
+			announce = false
+		}
+	}
 	for _, path := range localPaths {
-		if err := a.UploadFile(bucket, prefix, path); err != nil {
+		if err := a.uploadPath(bucket, prefix, path, announce); err != nil {
 			return err
 		}
 	}

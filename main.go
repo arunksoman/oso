@@ -16,6 +16,10 @@ func init() {
 	application.RegisterEvent[UploadProgressEvent](EventUploadProgress)
 	application.RegisterEvent[UploadDoneEvent](EventUploadDone)
 	application.RegisterEvent[UploadErrorEvent](EventUploadError)
+	application.RegisterEvent[AppSettings](EventSettingsChanged)
+	application.RegisterEvent[ProfilesChangedEvent](EventProfilesChanged)
+	application.RegisterEvent[FilesDroppedEvent](EventFilesDropped)
+	application.RegisterEvent[string](EventSettingsNavigate)
 }
 
 // newApplication builds the Wails app with its service, updater and main window
@@ -38,16 +42,7 @@ func newApplication(service *App) *application.App {
 		log.Printf("updater disabled: %v", err)
 	}
 
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:            "Oso — Object Storage Operator",
-		Width:            1020,
-		Height:           740,
-		MinWidth:         1020,
-		MinHeight:        740,
-		Frameless:        true,
-		BackgroundColour: application.NewRGB(30, 33, 41),
-		URL:              "/",
-	})
+	newMainWindow(app)
 
 	return app
 }

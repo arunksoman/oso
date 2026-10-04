@@ -75,6 +75,12 @@ jobs:
       - name: Go vet
         run: go vet -tags server ./...
 
+      # The desktop build has files the server tag excludes (windows_native.go).
+      # Windows is the one platform where it compiles without cgo, GTK or WebKit.
+      - name: Go vet (desktop build)
+        if: runner.os == 'Windows'
+        run: go vet ./...
+
       - name: Go test with coverage gate
         run: node scripts/go-coverage.mjs
 

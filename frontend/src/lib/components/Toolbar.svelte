@@ -10,6 +10,7 @@
   } from '@hugeicons/core-free-icons';
   import { OpenMultipleFilesDialog, UploadFiles, OpenDirectoryDialog, UploadFile } from '$bindings/oso/app';
   import { appState } from '$lib/stores/appState.svelte';
+  import { openSettings } from '$lib/stores/sync';
   import Breadcrumb from './Breadcrumb.svelte';
 
   let uploading = $state(false);
@@ -168,7 +169,7 @@
 
       <button
         class="btn btn-ghost btn-xs p-1 h-auto min-h-0 text-base-content/50 hover:text-base-content ml-1"
-        onclick={() => { appState.showSettings = true; }}
+        onclick={() => openSettings()}
         title="Settings"
       >
         <HugeiconsIcon icon={Settings01Icon} size={16} />

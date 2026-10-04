@@ -3,6 +3,8 @@ import {
 	DeleteBucketCommand,
 	DeleteObjectCommand,
 	GetObjectCommand,
+	HeadBucketCommand,
+	HeadObjectCommand,
 	ListObjectsV2Command,
 	PutObjectCommand,
 	S3Client
@@ -57,4 +59,24 @@ export async function listKeys(prefix: string, name = bucket): Promise<string[]>
 export async function readObject(key: string): Promise<string> {
 	const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
 	return result.Body!.transformToString();
+}
+
+/** Content type and user metadata, as HeadObject reports them */
+export async function headObject(key: string) {
+	const result = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+	return { contentType: result.ContentType, metadata: result.Metadata ?? {} };
+}
+
+export async function bucketExists(name: string): Promise<boolean> {
+	try {
+		await client.send(new HeadBucketCommand({ Bucket: name }));
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/** Create an object in any bucket */
+export async function putObject(name: string, key: string, body: string) {
+	await client.send(new PutObjectCommand({ Bucket: name, Key: key, Body: body }));
 }

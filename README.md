@@ -6,14 +6,19 @@ A cross-platform desktop application for browsing and managing S3-compatible obj
 
 - Browse buckets and objects with a native file-explorer feel
 - Folder-first sorting with breadcrumb navigation
-- Upload files with drag-and-drop and progress tracking
+- Upload files and folders by dropping them onto the window, with progress tracking
+- Drag rows onto a folder to move them
 - Download files with configurable save location
 - Copy, move, and delete objects and folders
 - Multi-select operations
 - Generate presigned URLs with configurable expiry
+- Object properties panel: content type, ETag, storage class, metadata and tags, with in-place editing of content type and metadata
+- Create and delete buckets (deleting asks you to type the bucket name)
+- Multiple connection profiles: switch between AWS, RustFS, Garage and other accounts from the sidebar
+- Settings in their own window
 - Paginated listing — handles buckets with millions of objects
 - Supports any S3-compatible backend (AWS S3, MinIO, Garage, etc.)
-- Credentials saved locally in `~/.oso/config.json`
+- Connection profiles saved locally in `~/.oso/profiles.json`
 
 ## Tech Stack
 

@@ -6,9 +6,11 @@ import {
   GetAvailableUpdate,
   GetVersion,
   ListBuckets,
+  OpenSettingsWindow,
+  SwitchProfile,
 } from '$bindings/oso/app';
 import { appState } from '$lib/stores/appState.svelte';
-import { deferred, file } from '../../test/helpers';
+import { deferred, file, profile } from '../../test/helpers';
 import Sidebar from './Sidebar.svelte';
 
 const buckets = [
@@ -233,6 +235,119 @@ describe('Sidebar', () => {
       expect(screen.queryByText('Name must be between 3 and 63 characters')).toBeNull();
       await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       expect(screen.queryByPlaceholderText('new-bucket-name')).toBeNull();
+    });
+  });
+
+  describe('bucket list changes', () => {
+    it('reloads when the bucket trigger changes', async () => {
+      render(Sidebar);
+      await screen.findByText('alpha');
+
+      appState.bucketsTrigger++;
+
+      await vi.waitFor(() => expect(ListBuckets).toHaveBeenCalledTimes(2));
+    });
+
+    it('asks for confirmation before deleting a bucket', async () => {
+      render(Sidebar);
+      await screen.findByText('alpha');
+
+      await fireEvent.click(screen.getByTitle('Delete bucket beta'));
+
+      expect(appState.deleteBucketTarget).toBe('beta');
+      // Asking does not open the bucket
+      expect(appState.currentBucket).toBeNull();
+    });
+  });
+
+  describe('connection switcher', () => {
+    const work = profile('work', { name: 'Work' });
+    const home = profile('home', { name: 'Home' });
+
+    function withProfiles() {
+      appState.profiles = [work, home];
+      appState.activeProfileId = 'work';
+      appState.connected = true;
+    }
+
+    it('shows the active connection', async () => {
+      withProfiles();
+      render(Sidebar);
+
+      const switcher = screen.getByTitle('Switch connection');
+      expect(switcher.textContent).toContain('Work');
+      expect(switcher.textContent).toContain('http://work.example.com:9000');
+      expect(screen.getByRole('button', { name: /Work/, current: true })).toBeTruthy();
+    });
+
+    it('has a placeholder for a connection that is not a saved profile', () => {
+      render(Sidebar);
+      expect(screen.getByTitle('Switch connection').textContent).toContain('Connection');
+      expect(screen.getByRole('button', { name: 'Manage connections' })).toBeTruthy();
+    });
+
+    it('switches to another profile and reloads the buckets', async () => {
+      withProfiles();
+      appState.currentBucket = 'alpha';
+      render(Sidebar);
+      await screen.findByText('alpha');
+
+      await fireEvent.click(screen.getByRole('button', { name: /Home/ }));
+      await vi.waitFor(() => expect(appState.activeProfileId).toBe('home'));
+
+      expect(SwitchProfile).toHaveBeenCalledWith('home');
+      expect(appState.currentBucket).toBeNull();
+      expect(appState.notification).toEqual({ message: 'Connected to "Home"', type: 'success' });
+      await vi.waitFor(() => expect(ListBuckets).toHaveBeenCalledTimes(2));
+    });
+
+    it('does nothing when the active profile is chosen', async () => {
+      withProfiles();
+      render(Sidebar);
+
+      await fireEvent.click(screen.getByRole('button', { name: /Work/, current: true }));
+
+      expect(SwitchProfile).not.toHaveBeenCalled();
+    });
+
+    it('keeps the connection and reports a failed switch', async () => {
+      withProfiles();
+      vi.mocked(SwitchProfile).mockRejectedValue('connection failed: access denied');
+      render(Sidebar);
+
+      await fireEvent.click(screen.getByRole('button', { name: /Home/ }));
+
+      await vi.waitFor(() =>
+        expect(appState.notification).toEqual({ message: 'connection failed: access denied', type: 'error' })
+      );
+      expect(appState.activeProfileId).toBe('work');
+    });
+
+    it('shows a spinner and ignores a second switch while connecting', async () => {
+      withProfiles();
+      const pending = deferred<void>();
+      vi.mocked(SwitchProfile).mockReturnValue(pending.promise as never);
+      render(Sidebar);
+
+      await fireEvent.click(screen.getByRole('button', { name: /Home/ }));
+      await vi.waitFor(() =>
+        expect(screen.getByTitle('Switch connection').querySelector('.loading')).toBeTruthy()
+      );
+      await fireEvent.click(screen.getByRole('button', { name: /Home/ }));
+
+      expect(SwitchProfile).toHaveBeenCalledTimes(1);
+      pending.resolve();
+      await vi.waitFor(() => expect(appState.activeProfileId).toBe('home'));
+    });
+
+    it('opens the connections section of the settings window', async () => {
+      vi.mocked(OpenSettingsWindow).mockResolvedValue(true);
+      withProfiles();
+      render(Sidebar);
+
+      await fireEvent.click(screen.getByRole('button', { name: 'Manage connections' }));
+
+      await vi.waitFor(() => expect(OpenSettingsWindow).toHaveBeenCalledWith('connections'));
     });
   });
 });

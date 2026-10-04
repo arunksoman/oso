@@ -12,6 +12,10 @@ import type * as main$0 from "../../../../../oso/models.js";
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
+            "files:dropped": main$0.FilesDroppedEvent;
+            "profiles:changed": main$0.ProfilesChangedEvent;
+            "settings:changed": main$0.AppSettings;
+            "settings:navigate": string;
             "upload:done": main$0.UploadDoneEvent;
             "upload:error": main$0.UploadErrorEvent;
             "upload:folder:start": main$0.UploadFolderStartEvent;

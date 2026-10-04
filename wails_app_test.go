@@ -308,3 +308,110 @@ func TestUploadEmitsEventsThroughApplication(t *testing.T) {
 		t.Errorf("uploaded body = %q (found %v), want \"report body\"", body, ok)
 	}
 }
+
+// collectEvents records the payloads of a custom event
+func collectEvents(t *testing.T, app *application.App, name string) func() []any {
+	t.Helper()
+	var mu sync.Mutex
+	var seen []any
+	off := app.Event.On(name, func(event *application.CustomEvent) {
+		mu.Lock()
+		defer mu.Unlock()
+		seen = append(seen, event.Data)
+	})
+	t.Cleanup(off)
+	return func() []any {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]any(nil), seen...)
+	}
+}
+
+func TestMainWindowIsRegistered(t *testing.T) {
+	app, _ := wailsTestApp(t)
+
+	if _, ok := app.Window.GetByName(mainWindowName); !ok {
+		t.Error("newApplication did not create the main window")
+	}
+}
+
+func TestOpenSettingsWindow(t *testing.T) {
+	app, service := wailsTestApp(t)
+
+	// Server mode has no native windows: the frontend opens the page itself
+	if service.OpenSettingsWindow("general") {
+		t.Error("OpenSettingsWindow() = true in server mode, want false")
+	}
+	if _, ok := app.Window.GetByName(settingsWindowName); ok {
+		t.Fatal("no settings window should exist in server mode")
+	}
+
+	nativeWindows = true
+	t.Cleanup(func() { nativeWindows = false })
+	navigations := collectEvents(t, app, EventSettingsNavigate)
+
+	if !service.OpenSettingsWindow("connections") {
+		t.Fatal("OpenSettingsWindow() = false, want the window to open")
+	}
+	window, ok := app.Window.GetByName(settingsWindowName)
+	if !ok {
+		t.Fatal("the settings window was not created")
+	}
+	t.Cleanup(func() { app.Window.Remove(window.ID()) })
+
+	// A second call reuses the window and moves it to the requested section
+	if !service.OpenSettingsWindow("about") || !service.OpenSettingsWindow("") {
+		t.Fatal("OpenSettingsWindow() = false for the existing window")
+	}
+	settingsWindows := 0
+	for _, w := range app.Window.GetAll() {
+		if w.Name() == settingsWindowName {
+			settingsWindows++
+		}
+	}
+	if settingsWindows != 1 {
+		t.Errorf("%d settings windows, want 1", settingsWindows)
+	}
+	waitFor(t, "the section change to be announced", func() bool {
+		seen := navigations()
+		return len(seen) == 1 && seen[0] == "about"
+	})
+
+	// Closing the explorer takes the settings window with it
+	closeSettingsWindow(app)
+	waitFor(t, "the settings window to close", func() bool {
+		_, open := app.Window.GetByName(settingsWindowName)
+		return !open
+	})
+	closeSettingsWindow(app)
+}
+
+func TestSettingsAndProfileChangesAreBroadcast(t *testing.T) {
+	wailsApp, _ := wailsTestApp(t)
+	isolateHome(t)
+	_, srv := newFakeS3(t)
+	app := NewApp()
+	settings := collectEvents(t, wailsApp, EventSettingsChanged)
+	profiles := collectEvents(t, wailsApp, EventProfilesChanged)
+
+	if err := app.SaveSettings(AppSettings{PageSize: 250, Theme: "light"}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the saved settings to be broadcast", func() bool {
+		seen := settings()
+		return len(seen) == 1 && seen[0].(AppSettings).Theme == "light"
+	})
+
+	if err := app.Connect(S3Config{Endpoint: srv.URL, AccessKey: "key", SecretKey: "secret"}); err != nil {
+		t.Fatal(err)
+	}
+	app.Disconnect()
+	waitFor(t, "the connection changes to be broadcast", func() bool {
+		seen := profiles()
+		if len(seen) != 2 {
+			return false
+		}
+		first, second := seen[0].(ProfilesChangedEvent), seen[1].(ProfilesChangedEvent)
+		return first.Connected && first.ActiveID != "" && !second.Connected && second.ActiveID == ""
+	})
+}

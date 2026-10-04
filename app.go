@@ -6,11 +6,11 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -30,6 +30,12 @@ type App struct {
 	s3Client      *s3.Client
 	presignClient *s3.PresignClient
 	appConfig     *S3Config
+
+	// Connection profiles; mu guards them and the profile file
+	mu              sync.Mutex
+	profiles        []ConnectionProfile
+	activeProfileID string
+	envProfile      *ConnectionProfile
 }
 
 // S3Config holds S3 connection configuration
@@ -46,6 +52,7 @@ type AppSettings struct {
 	AskBeforeDownload   bool   `json:"askBeforeDownload"`
 	ShowFileDetails     bool   `json:"showFileDetails"`
 	PageSize            int32  `json:"pageSize"`
+	Theme               string `json:"theme"`
 }
 
 // Bucket represents an S3 bucket
@@ -134,7 +141,15 @@ func (a *App) settingsPath() string {
 	return filepath.Join(a.configDir(), "settings.json")
 }
 
+func (a *App) profilesPath() string {
+	return filepath.Join(a.configDir(), "profiles.json")
+}
+
+// loadConfig restores the saved profiles and connects: environment variables
+// first, then the profile that was active when the app last closed.
 func (a *App) loadConfig() {
+	a.loadProfiles()
+
 	endpoint := os.Getenv("S3_ENDPOINT")
 	accessKey := os.Getenv("S3_ACCESS_KEY")
 	secretKey := os.Getenv("S3_SECRET_KEY")
@@ -144,29 +159,32 @@ func (a *App) loadConfig() {
 		if region == "" {
 			region = "us-east-1"
 		}
-		cfg := &S3Config{
+		a.envProfile = &ConnectionProfile{
+			ID:        envProfileID,
+			Name:      "Environment",
 			Endpoint:  endpoint,
 			AccessKey: accessKey,
 			SecretKey: secretKey,
 			Region:    region,
+			ReadOnly:  true,
 		}
-		_ = a.connectWithConfig(cfg)
+		cfg := a.envProfile.config()
+		_ = a.connectWithConfig(&cfg)
+		a.activeProfileID = envProfileID
 		return
 	}
 
-	data, err := os.ReadFile(a.configPath())
-	if err != nil {
+	profile, ok := a.findProfile(a.activeProfileID)
+	if !ok {
+		a.activeProfileID = ""
 		return
 	}
-	var cfg S3Config
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return
-	}
-	a.appConfig = &cfg
+	cfg := profile.config()
 	_ = a.connectWithConfig(&cfg)
 }
 
-func (a *App) connectWithConfig(cfg *S3Config) error {
+// newS3Clients builds the S3 and presign clients for a configuration
+func newS3Clients(cfg *S3Config) (*s3.Client, *s3.PresignClient, error) {
 	if cfg.Region == "" {
 		cfg.Region = "us-east-1"
 	}
@@ -178,7 +196,7 @@ func (a *App) connectWithConfig(cfg *S3Config) error {
 		),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to load AWS config: %w", err)
+		return nil, nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
@@ -187,51 +205,23 @@ func (a *App) connectWithConfig(cfg *S3Config) error {
 		o.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
 		o.ResponseChecksumValidation = aws.ResponseChecksumValidationWhenRequired
 	})
+	return client, s3.NewPresignClient(client), nil
+}
 
+func (a *App) connectWithConfig(cfg *S3Config) error {
+	client, presign, err := newS3Clients(cfg)
+	if err != nil {
+		return err
+	}
 	a.s3Client = client
-	a.presignClient = s3.NewPresignClient(client)
+	a.presignClient = presign
 	a.appConfig = cfg
 	return nil
 }
 
-// GetSavedConfig returns the saved S3 configuration
+// GetSavedConfig returns the configuration of the active connection
 func (a *App) GetSavedConfig() *S3Config {
 	return a.appConfig
-}
-
-// Connect connects to S3 with the given configuration and tests it
-func (a *App) Connect(cfg S3Config) error {
-	if err := a.connectWithConfig(&cfg); err != nil {
-		return err
-	}
-
-	_, err := a.s3Client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
-	if err != nil {
-		a.s3Client = nil
-		a.presignClient = nil
-		a.appConfig = nil
-		return fmt.Errorf("connection failed: %w", err)
-	}
-
-	return a.SaveConfig(cfg)
-}
-
-// SaveConfig persists the S3 config to disk
-func (a *App) SaveConfig(cfg S3Config) error {
-	if err := os.MkdirAll(a.configDir(), 0700); err != nil {
-		return err
-	}
-	data, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(a.configPath(), data, 0600)
-}
-
-// Disconnect clears the active S3 connection
-func (a *App) Disconnect() {
-	a.s3Client = nil
-	a.presignClient = nil
 }
 
 // IsConnected returns true if currently connected to S3

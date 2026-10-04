@@ -9,6 +9,7 @@
     Link03Icon,
     FolderAddIcon,
     Upload01Icon,
+    InformationCircleIcon,
   } from '@hugeicons/core-free-icons';
   import { appState } from '$lib/stores/appState.svelte';
   import type { S3Object } from '$lib/stores/appState.svelte';
@@ -18,6 +19,7 @@
     onclose,
     ondownload,
     onpresignedurl,
+    onproperties,
     oncopy,
     oncut,
     onpaste,
@@ -30,6 +32,7 @@
     onclose: () => void;
     ondownload: (obj: S3Object) => void;
     onpresignedurl: (obj: S3Object) => void;
+    onproperties: (obj: S3Object) => void;
     oncopy: () => void;
     oncut: () => void;
     onpaste: () => void;
@@ -69,6 +72,13 @@
       >
         <HugeiconsIcon icon={Link03Icon} size={14} class="text-base-content/60" />
         Copy presigned URL
+      </button>
+      <button
+        class="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm hover:bg-base-300 text-left transition-colors"
+        onclick={() => onproperties(t)}
+      >
+        <HugeiconsIcon icon={InformationCircleIcon} size={14} class="text-base-content/60" />
+        Properties
       </button>
       <div class="h-px bg-base-300 my-1"></div>
     {/if}

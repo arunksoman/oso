@@ -2,17 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import {
+  GetActiveProfileID,
   GetAvailableUpdate,
+  GetObjectProperties,
   GetPresignedURL,
   GetSettings,
   GetVersion,
   IsConnected,
   ListBuckets,
+  ListProfiles,
 } from '$bindings/oso/app';
 import { Events } from '@wailsio/runtime';
 import { appState } from '$lib/stores/appState.svelte';
 import type { NotificationType } from '$lib/stores/appState.svelte';
-import { deferred } from '../test/helpers';
+import { deferred, profile } from '../test/helpers';
 import Page from './+page.svelte';
 
 type Handler = (event: { data: Record<string, unknown> }) => void;
@@ -38,6 +41,7 @@ describe('+page', () => {
       askBeforeDownload: false,
       showFileDetails: false,
       pageSize: 250,
+      theme: 'light',
     });
     vi.mocked(ListBuckets).mockResolvedValue([]);
     vi.mocked(GetVersion).mockResolvedValue('0.7.0');
@@ -67,7 +71,26 @@ describe('+page', () => {
       render(Page);
 
       expect(await screen.findByText('Object Storage Operator')).toBeTruthy();
-      expect(GetSettings).not.toHaveBeenCalled();
+      // The theme applies to the setup screen too
+      expect(appState.settings.theme).toBe('light');
+    });
+
+    it('offers the saved profiles on the setup screen', async () => {
+      vi.mocked(IsConnected).mockResolvedValue(false);
+      vi.mocked(ListProfiles).mockResolvedValue([profile('work', { name: 'Work' })]);
+      render(Page);
+
+      expect(await screen.findByText('Saved connections')).toBeTruthy();
+      expect(screen.getByText('Work')).toBeTruthy();
+    });
+
+    it('loads the profiles and the active one', async () => {
+      vi.mocked(ListProfiles).mockResolvedValue([profile('work', { name: 'Work' }), profile('home')]);
+      vi.mocked(GetActiveProfileID).mockResolvedValue('work');
+      await openShell();
+
+      expect(appState.activeProfileId).toBe('work');
+      expect(screen.getByTitle('Switch connection').textContent).toContain('Work');
     });
 
     it('loads settings and shows the shell when connected', async () => {
@@ -79,7 +102,7 @@ describe('+page', () => {
         askBeforeDownload: false,
         showFileDetails: false,
         pageSize: 250,
-        theme: 'night',
+        theme: 'light',
       });
     });
 
@@ -92,9 +115,12 @@ describe('+page', () => {
       expect(error).toHaveBeenCalledWith('Startup error:', 'runtime unavailable');
     });
 
-    it('registers every upload event', async () => {
+    it('registers every backend event', async () => {
       await openShell();
       expect(vi.mocked(Events.On).mock.calls.map(([name]) => name).sort()).toEqual([
+        'files:dropped',
+        'profiles:changed',
+        'settings:changed',
         'upload:done',
         'upload:error',
         'upload:folder:start',
@@ -189,9 +215,9 @@ describe('+page', () => {
       vi.mocked(GetPresignedURL).mockResolvedValue('https://s3.example/signed');
       await openShell();
 
-      appState.showSettings = true;
-      expect(await screen.findByText('Settings')).toBeTruthy();
-      appState.showSettings = false;
+      appState.deleteBucketTarget = 'photos';
+      expect(await screen.findByText('Delete Bucket')).toBeTruthy();
+      appState.deleteBucketTarget = null;
 
       appState.deleteTarget = { bucket: 'b', keys: ['a.txt'], hasFolder: false };
       appState.showDeleteConfirm = true;
@@ -201,6 +227,60 @@ describe('+page', () => {
       appState.presignedUrlTarget = { bucket: 'b', key: 'a.txt', name: 'a.txt' };
       appState.showPresignedUrl = true;
       expect(await screen.findByText('Presigned URL')).toBeTruthy();
+    });
+  });
+
+  describe('changes from the settings window', () => {
+    it('applies saved settings', async () => {
+      await openShell();
+
+      emit('settings:changed', {
+        defaultDownloadPath: '/tmp',
+        askBeforeDownload: true,
+        showFileDetails: true,
+        pageSize: 500,
+        theme: 'night',
+      });
+      await tick();
+
+      expect(appState.settings.pageSize).toBe(500);
+      expect(appState.settings.theme).toBe('night');
+    });
+
+    it('reloads the buckets when another profile becomes active', async () => {
+      vi.mocked(GetActiveProfileID).mockResolvedValue('work');
+      await openShell();
+      appState.currentBucket = 'old-bucket';
+      vi.mocked(ListBuckets).mockClear();
+      vi.mocked(ListProfiles).mockResolvedValue([profile('home', { name: 'Home' })]);
+
+      emit('profiles:changed', { activeId: 'home', connected: true });
+
+      await vi.waitFor(() => expect(ListBuckets).toHaveBeenCalledTimes(1));
+      expect(appState.currentBucket).toBeNull();
+      await vi.waitFor(() => expect(appState.profiles.map((p) => p.id)).toEqual(['home']));
+    });
+
+    it('returns to the setup screen on disconnect', async () => {
+      vi.mocked(GetActiveProfileID).mockResolvedValue('work');
+      await openShell();
+      vi.mocked(ListProfiles).mockRejectedValue('gone');
+
+      emit('profiles:changed', { activeId: '', connected: false });
+
+      expect(await screen.findByText('Object Storage Operator')).toBeTruthy();
+    });
+  });
+
+  describe('properties panel', () => {
+    it('opens next to the explorer', async () => {
+      vi.mocked(GetObjectProperties).mockResolvedValue(null);
+      await openShell();
+      appState.currentBucket = 'b';
+
+      appState.propertiesTarget = { bucket: 'b', key: 'a.txt', name: 'a.txt' };
+
+      expect(await screen.findByLabelText('Object properties')).toBeTruthy();
     });
   });
 

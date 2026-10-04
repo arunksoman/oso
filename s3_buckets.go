@@ -63,3 +63,23 @@ func (a *App) CreateBucket(name string) error {
 	}
 	return nil
 }
+
+// DeleteBucket deletes a bucket. S3 only deletes empty buckets, so with
+// deleteContents every object in it is removed first.
+func (a *App) DeleteBucket(name string, deleteContents bool) error {
+	if a.s3Client == nil {
+		return fmt.Errorf("not connected to S3")
+	}
+	if deleteContents {
+		if err := a.DeleteFolder(name, ""); err != nil {
+			return fmt.Errorf("failed to empty bucket: %w", err)
+		}
+	}
+	_, err := a.s3Client.DeleteBucket(context.TODO(), &s3.DeleteBucketInput{
+		Bucket: aws.String(name),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to delete bucket: %w", err)
+	}
+	return nil
+}

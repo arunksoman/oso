@@ -1,11 +1,16 @@
+import { vi } from 'vitest';
+import { Events } from '@wailsio/runtime';
 import { appState } from '$lib/stores/appState.svelte';
-import type { S3Object } from '$lib/stores/appState.svelte';
+import type { ConnectionProfile, S3Object } from '$lib/stores/appState.svelte';
 
 /** Restore the shared store to its startup state */
 export function resetAppState() {
   appState.connected = false;
+  appState.profiles = [];
+  appState.activeProfileId = '';
   appState.buckets = [];
   appState.bucketsLoading = false;
+  appState.bucketsTrigger = 0;
   appState.currentBucket = null;
   appState.currentPrefix = '';
   appState.objects = [];
@@ -23,13 +28,14 @@ export function resetAppState() {
     theme: 'night',
     pageSize: 1000,
   };
-  appState.showSettings = false;
   appState.showPresignedUrl = false;
   appState.showDeleteConfirm = false;
   appState.showNewFolder = false;
   appState.searchQuery = '';
   appState.presignedUrlTarget = null;
   appState.deleteTarget = null;
+  appState.deleteBucketTarget = null;
+  appState.propertiesTarget = null;
   appState.refreshTrigger = 0;
   appState.notification = null;
 }
@@ -65,4 +71,26 @@ export function deferred<T>() {
     reject = rej;
   });
   return { promise, resolve, reject };
+}
+
+export function profile(id: string, overrides: Partial<ConnectionProfile> = {}): ConnectionProfile {
+  return {
+    id,
+    name: `Profile ${id}`,
+    endpoint: `http://${id}.example.com:9000`,
+    accessKey: `${id}-key`,
+    secretKey: `${id}-secret`,
+    region: 'us-east-1',
+    readOnly: false,
+    ...overrides,
+  };
+}
+
+type Handler = (event: { data: unknown }) => void;
+
+/** Emit a backend event to every listener the rendered components registered */
+export function emitEvent(name: string, data: unknown) {
+  const calls = vi.mocked(Events.On).mock.calls.filter(([event]) => event === name);
+  if (calls.length === 0) throw new Error(`no listener registered for ${name}`);
+  for (const call of calls) (call[1] as unknown as Handler)({ data });
 }

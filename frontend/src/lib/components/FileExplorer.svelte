@@ -1,5 +1,6 @@
 ﻿<script lang="ts">
-  import { untrack } from "svelte";
+  import { onMount, untrack } from "svelte";
+  import { Events } from "@wailsio/runtime";
   import { createVirtualizer } from "@tanstack/svelte-virtual";
   import HugeiconsIcon from "$lib/components/Icon.svelte";
   import { Folder01Icon } from "@hugeicons/core-free-icons";
@@ -34,6 +35,9 @@
 
   // Context menu
   let ctxMenu = $state<{ x: number; y: number; target: S3Object | null } | null>(null);
+
+  // Rows being dragged onto a folder
+  let draggedKeys = $state<string[] | null>(null);
 
   // New-folder input
   let newFolderName = $state("");
@@ -284,9 +288,14 @@
     closeCtx();
   }
 
-  async function doPaste() {
-    if (!appState.clipboard || !appState.currentBucket) return;
-    const { operation, bucket: src, keys } = appState.clipboard;
+  /** Copy or move keys into a folder; failures are counted, not thrown */
+  async function transfer(
+    operation: "copy" | "cut",
+    srcBucket: string,
+    keys: string[],
+    dstBucket: string,
+    dstPrefix: string,
+  ) {
     let succeeded = 0;
     let failed = 0;
     for (const key of keys) {
@@ -294,26 +303,39 @@
         const isFolder = key.endsWith("/");
         const name = key.split("/").filter(Boolean).pop() ?? key;
         if (isFolder) {
-          const dstPrefix = appState.currentPrefix + name + "/";
+          const dstFolder = dstPrefix + name + "/";
           if (operation === "copy") {
-            await CopyFolder(src, key, appState.currentBucket, dstPrefix);
+            await CopyFolder(srcBucket, key, dstBucket, dstFolder);
           } else {
-            await MoveFolder(src, key, appState.currentBucket, dstPrefix);
+            await MoveFolder(srcBucket, key, dstBucket, dstFolder);
           }
         } else {
-          const dstKey = appState.currentPrefix + name;
+          const dstKey = dstPrefix + name;
           if (operation === "copy") {
-            await CopyObject(src, key, appState.currentBucket, dstKey);
+            await CopyObject(srcBucket, key, dstBucket, dstKey);
           } else {
-            await MoveObject(src, key, appState.currentBucket, dstKey);
+            await MoveObject(srcBucket, key, dstBucket, dstKey);
           }
         }
         succeeded++;
       } catch (e) {
-        console.error(`Paste item failed: ${key}`, e);
+        console.error(`Transfer failed: ${key}`, e);
         failed++;
       }
     }
+    return { succeeded, failed };
+  }
+
+  async function doPaste() {
+    if (!appState.clipboard || !appState.currentBucket) return;
+    const { operation, bucket: src, keys } = appState.clipboard;
+    const { succeeded, failed } = await transfer(
+      operation,
+      src,
+      keys,
+      appState.currentBucket,
+      appState.currentPrefix,
+    );
     if (operation === "cut") appState.clipboard = null;
     if (failed === 0) {
       appState.notify(`Pasted ${succeeded} item(s)`, "success");
@@ -323,6 +345,79 @@
       appState.notify(`Paste failed for all ${failed} item(s)`, "error");
     }
     appState.refreshTrigger = Date.now();
+    closeCtx();
+  }
+
+  // Drag rows onto a folder to move them
+
+  function handleRowDragStart(e: DragEvent, obj: S3Object) {
+    // Dragging a selected row takes the whole selection along
+    const keys = appState.selectedKeys.has(obj.key) ? [...appState.selectedKeys] : [obj.key];
+    draggedKeys = keys;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", keys.join("\n"));
+    }
+  }
+
+  async function handleDropOnFolder(folder: S3Object) {
+    const keys = draggedKeys;
+    const bucket = appState.currentBucket;
+    draggedKeys = null;
+    if (!keys?.length || !bucket || keys.includes(folder.key)) return;
+
+    const { succeeded, failed } = await transfer("cut", bucket, keys, bucket, folder.key);
+    if (failed === 0) {
+      appState.notify(`Moved ${succeeded} item(s) to "${folder.name}"`, "success");
+    } else if (succeeded > 0) {
+      appState.notify(`Moved ${succeeded} item(s) to "${folder.name}", ${failed} failed`, "warning");
+    } else {
+      appState.notify(`Move failed for all ${failed} item(s)`, "error");
+    }
+    if (appState.clipboard?.keys.some((k) => keys.includes(k))) appState.clipboard = null;
+    if (appState.propertiesTarget && keys.includes(appState.propertiesTarget.key)) {
+      appState.propertiesTarget = null;
+    }
+    appState.selectedKeys = new Set();
+    appState.refreshTrigger = Date.now();
+  }
+
+  // Files dragged from the OS onto the window
+
+  async function uploadPaths(paths: string[], prefix: string) {
+    if (!appState.currentBucket) return;
+    try {
+      if (paths.length > 1) {
+        appState.uploadBatch = { total: paths.length, done: 0, errors: 0 };
+      }
+
+      await UploadFiles(appState.currentBucket, prefix, paths);
+
+      if (paths.length === 1) {
+        appState.notify(`Uploaded "${paths[0].split(/[\\/]/).pop()}"`, "success");
+      }
+      appState.refreshTrigger = Date.now();
+    } catch (e) {
+      appState.uploadBatch = null;
+      appState.notify(`Upload failed: ${e}`, "error");
+    }
+  }
+
+  onMount(() =>
+    Events.On("files:dropped", ({ data }) => {
+      if (!data.paths?.length) return;
+      if (!appState.currentBucket) {
+        appState.notify("Select a bucket first", "error");
+        return;
+      }
+      // Dropped on a folder row: upload into that folder
+      void uploadPaths(data.paths, data.prefix || appState.currentPrefix);
+    }),
+  );
+
+  function doProperties(obj: S3Object) {
+    if (obj.isFolder || !appState.currentBucket) return;
+    appState.propertiesTarget = { bucket: appState.currentBucket, key: obj.key, name: obj.name };
     closeCtx();
   }
 
@@ -373,19 +468,8 @@
     try {
       const files = await OpenMultipleFilesDialog();
       if (!files?.length) return;
-
-      if (files.length > 1) {
-        appState.uploadBatch = { total: files.length, done: 0, errors: 0 };
-      }
-
-      await UploadFiles(appState.currentBucket, appState.currentPrefix, files);
-
-      if (files.length === 1) {
-        appState.notify(`Uploaded "${files[0].split("/").pop()}"`, "success");
-      }
-      appState.refreshTrigger = Date.now();
+      await uploadPaths(files, appState.currentPrefix);
     } catch (e) {
-      appState.uploadBatch = null;
       appState.notify(`Upload failed: ${e}`, "error");
     }
     closeCtx();
@@ -453,7 +537,7 @@
 
 <svelte:window onkeydown={handleKey} onclick={closeCtx} />
 
-<div class="flex flex-col flex-1 overflow-hidden">
+<div class="flex flex-col flex-1 min-w-0 overflow-hidden">
   {#if !appState.currentBucket}
     <div
       class="flex flex-col items-center justify-center flex-1 gap-3 text-base-content/15 select-none"
@@ -507,6 +591,12 @@
       ontogglecheck={toggleCheck}
       onopenItemMenu={openItemMenu}
       onupload={doUpload}
+      {draggedKeys}
+      onrowdragstart={handleRowDragStart}
+      onrowdragend={() => {
+        draggedKeys = null;
+      }}
+      ondropfolder={handleDropOnFolder}
     />
 
     <FileStatusBar
@@ -524,6 +614,7 @@
     onclose={closeCtx}
     ondownload={(obj) => doDownload(obj)}
     onpresignedurl={(obj) => doPresignedUrl(obj)}
+    onproperties={(obj) => doProperties(obj)}
     oncopy={doCopy}
     oncut={doCut}
     onpaste={doPaste}

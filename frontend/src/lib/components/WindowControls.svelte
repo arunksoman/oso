@@ -9,7 +9,9 @@
     Sun02Icon,
   } from '@hugeicons/core-free-icons';
   import { Application, Window } from '@wailsio/runtime';
+  import { SaveSettings } from '$bindings/oso/app';
   import { appState } from '$lib/stores/appState.svelte';
+  import type { Theme } from '$lib/stores/appState.svelte';
 
   let maximized = $state(false);
 
@@ -27,9 +29,13 @@
     await checkMaximized();
   }
 
-  function applyTheme(theme: 'night' | 'light') {
+  function applyTheme(theme: Theme) {
     appState.settings.theme = theme;
     document.documentElement.setAttribute('data-theme', theme);
+    // Saved so the theme survives a restart and reaches the settings window
+    SaveSettings({ ...appState.settings }).catch((e) => {
+      appState.notify(`Could not save the theme: ${e}`, 'error');
+    });
   }
 
   const isDark = $derived(appState.settings.theme === 'night');

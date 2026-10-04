@@ -23,8 +23,9 @@ func TestSaveFailsWhenConfigDirCannotBeCreated(t *testing.T) {
 	homeAsFile(t)
 	app := NewApp()
 
-	if err := app.SaveConfig(S3Config{Endpoint: "http://localhost:9000"}); err == nil {
-		t.Error("SaveConfig: expected an error")
+	profile := ConnectionProfile{Endpoint: "http://localhost:9000", AccessKey: "key", SecretKey: "secret"}
+	if _, err := app.SaveProfile(profile); err == nil {
+		t.Error("SaveProfile: expected an error")
 	}
 	if err := app.SaveSettings(AppSettings{PageSize: 100}); err == nil {
 		t.Error("SaveSettings: expected an error")
@@ -64,6 +65,11 @@ func TestServerErrorsAreReturned(t *testing.T) {
 		"DownloadObject": func() error { return app.DownloadObject("b", "dir/file.txt", filepath.Join(t.TempDir(), "f")) },
 		"CreateFolder":   func() error { return app.CreateFolder("b", "", "new") },
 		"UploadFile":     func() error { return app.UploadFile("b", "", local) },
+		"DeleteBucket":   func() error { return app.DeleteBucket("b", false) },
+		"EmptyBucket":    func() error { return app.DeleteBucket("b", true) },
+		"GetProperties":  func() error { _, err := app.GetObjectProperties("b", "dir/file.txt"); return err },
+		"SetProperties":  func() error { return app.UpdateObjectProperties("b", "dir/file.txt", "text/plain", nil) },
+		"TestConnection": func() error { return app.TestConnection(*app.GetSavedConfig()) },
 	}
 	for name, call := range calls {
 		if err := call(); err == nil {
@@ -135,7 +141,7 @@ func TestUploadFileWithKeyMissingLocalFile(t *testing.T) {
 func TestUploadFolderMissingDirectory(t *testing.T) {
 	app, _ := newConnectedApp(t)
 
-	if err := app.uploadFolderContents("b", "", filepath.Join(t.TempDir(), "missing")); err == nil {
+	if err := app.uploadFolderContents("b", "", filepath.Join(t.TempDir(), "missing"), true); err == nil {
 		t.Error("expected an error for a missing local folder")
 	}
 }
