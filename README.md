@@ -63,15 +63,15 @@ wails3 task linux:create:deb         # .deb (also linux:create:rpm, linux:create
 
 Set `VERSION=x.y.z` in the environment to stamp the version into the binary. App metadata (name, company, version) lives in [build/config.yml](build/config.yml). Keep `version` numeric (`X.Y.Z`) because Windows installers reject pre-release suffixes; put the full version such as `0.7.0-beta.1` in `displayVersion`, which is what the app shows. After changing it run `wails3 task common:update:build-assets` to regenerate Info.plist, NSIS and nfpm files.
 
-## Local Testing with MinIO
+## Local Testing with RustFS
 
-A Docker Compose setup is included to run a local MinIO instance.
+A Docker Compose setup is included to run a local [RustFS](https://rustfs.com) instance (single node, single disk).
 
 ```bash
 docker compose up -d
 ```
 
-Open the MinIO console at `http://localhost:9001` and log in with:
+Open the RustFS console at `http://localhost:9001` and log in with:
 
 | Field    | Value       |
 |----------|-------------|
@@ -99,9 +99,7 @@ oso/
 ├── main.go                 # Wails app entry point
 ├── Taskfile.yml            # Build pipeline entry point
 ├── build/                  # Build config, icons and platform Taskfiles
-├── docker-compose.yaml     # Local MinIO for development
-├── docker/
-│   └── minio/              # MinIO init script
+├── docker-compose.yaml     # Local RustFS for development
 └── frontend/
     ├── bindings/           # Auto-generated Go bindings (wails3 generate bindings)
     └── src/

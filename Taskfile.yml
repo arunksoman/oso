@@ -89,7 +89,7 @@ tasks:
       - '{{.PACKAGE_MANAGER}} run test:coverage'
 
   test:e2e:
-    summary: Runs the Playwright end-to-end tests (needs MinIO from docker compose up -d)
+    summary: Runs the Playwright end-to-end tests (needs RustFS from docker compose up -d)
     dir: frontend
     deps:
       - task: common:build:server
